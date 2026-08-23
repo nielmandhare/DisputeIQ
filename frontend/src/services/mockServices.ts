@@ -1,4 +1,4 @@
-import { AuditEvent, Contradiction, Dispute, EvidenceDocument, GapItem, ErsBreakdown, TimelineEvent, ResponseDraft } from '../types';
+import { AuditEvent, Contradiction, Dispute, EvidenceDocument, GapItem, ErsBreakdown, TimelineEvent, ResponseDraft, SubmitResult } from '../types';
 import {
   DEMO_DISPUTES, DEMO_DOCS, DEMO_GAPS, DEMO_ERS, DEMO_AUDIT, DEMO_CONTRADICTION, OCR_ISSUE_DOC, OVERVIEW_STATS,
 } from '../data/mockData';
@@ -49,27 +49,35 @@ async function apiGet<T>(path: string, timeoutMs = 2500): Promise<T | null> {
   }
 }
 
-async function apiPost<T>(path: string, body: unknown, timeoutMs = 5000): Promise<T | null> {
+async function apiPost<T>(path: string, body?: unknown, timeoutMs = 15000): Promise<T | null> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      let message = '';
+      try { message = (await res.json()).message || ''; } catch { /* ignore */ }
+      // Surface backend rejection (e.g. not approved / missing evidence) to the caller.
+      const err = new Error(message || `Submission rejected (${res.status})`) as Error & { code?: string };
+      err.code = `HTTP_${res.status}`;
+      throw err;
+    }
     return (await res.json()) as T;
-  } catch {
-    return null; // network/timeout -> fallback to mock
+  } catch (e) {
+    if (e instanceof TypeError || (e as Error).name === 'AbortError') return null; // offline -> mock fallback
+    throw e; // backend rejection propagates
   } finally {
     clearTimeout(t);
   }
 }
 
-// Simulate a contest submission to Razorpay (mock). Returns API-style response.
-export interface SubmitResult { status: number; dispute_id: string; contest_submitted_at: string; evidence_count: number; }
+// Current submission mode from backend (SIMULATED unless real creds + live flag).
+export interface SubmissionMode { razorpayConfigured: boolean; submissionMode: 'SIMULATED' | 'LIVE'; }
 
 export const disputeService = {
   async list(): Promise<Dispute[]> {
@@ -267,17 +275,30 @@ export const auditService = {
 };
 
 export const submissionService = {
-  // Mock contest submission (DEMO MODE — SUBMISSION SIMULATED)
+  // Real human-gated submission (backend enforces all safety conditions + idempotency).
   async submit(id: string): Promise<SubmitResult> {
+    const live = await apiPost<SubmitResult>(`/api/disputes/${id}/submit`);
+    if (live) return live;
+    // Mock fallback (offline): clearly mark as simulated.
     await delay(1500);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     const count = d?.documents?.length ?? 3;
     return {
-      status: 200,
-      dispute_id: id,
-      contest_submitted_at: '2026-08-22T13:12:00Z',
-      evidence_count: count,
+      id: `sub_${Math.random().toString(36).slice(2, 10)}`,
+      disputeId: id,
+      draftId: 'rd_mock',
+      draftVersion: 1,
+      mode: 'SIMULATED',
+      status: 'SUBMITTED',
+      razorpayStatus: 'SIMULATED',
+      evidenceUploaded: Array.from({ length: count }, (_, i) => ({ localEvidenceId: `ev_${i}`, razorpayDocumentId: `sim_ev_${i}` })),
+      startedAt: Math.floor(Date.now() / 1000),
+      completedAt: Math.floor(Date.now() / 1000),
+      metadata: { simulated: true },
     };
+  },
+  async getForDispute(id: string): Promise<SubmitResult | null> {
+    return apiGet<SubmitResult>(`/api/disputes/${id}/submission`);
   },
 };
 

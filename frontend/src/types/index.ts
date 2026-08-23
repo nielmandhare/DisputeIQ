@@ -159,6 +159,8 @@ export interface Dispute {
   gaps?: GapItem[];
   ersBreakdown?: ErsBreakdown;
   responseStatus?: 'DRAFT_READY' | 'DRAFT_REVIEW_REQUIRED' | 'APPROVED' | null;
+  submissionStatus?: 'SUBMISSION_PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'SUBMISSION_FAILED' | 'SUBMISSION_REQUIRES_REVIEW' | null;
+  submittedAt?: number | null;
   paymentContext?: { paymentId: string; orderId: string; timestamp: string; method: string };
   audit?: AuditEvent[];
 }
@@ -216,4 +218,27 @@ export interface ResponseDraft {
   fallbackUsed: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Slice 8 — submission result (matches backend POST /api/disputes/:id/submit).
+export interface SubmitResult {
+  id: string;
+  disputeId: string;
+  draftId: string;
+  draftVersion: number;
+  mode: 'SIMULATED' | 'LIVE';
+  status: 'SUBMISSION_PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'SUBMISSION_FAILED' | 'SUBMISSION_REQUIRES_REVIEW';
+  httpStatus?: number | null;
+  razorpayStatus?: string | null;
+  errorText?: string | null;
+  evidenceUploaded?: Array<{ localEvidenceId: string; razorpayDocumentId: string | null }>;
+  requestId?: string;
+  startedAt: number;
+  completedAt?: number | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SubmissionMode {
+  razorpayConfigured: boolean;
+  submissionMode: 'SIMULATED' | 'LIVE';
 }
