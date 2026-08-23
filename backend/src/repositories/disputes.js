@@ -17,6 +17,10 @@ const REASON_LABELS = {
   general: 'General',
 };
 
+function safeParse(s) {
+  try { return s ? JSON.parse(s) : undefined; } catch { return undefined; }
+}
+
 /** Map a Razorpay dispute object to our internal DB row. */
 function normalizeRazorpayDispute(rzp) {
   return {
@@ -53,7 +57,8 @@ export function rowToDispute(row) {
     amount: amountInr,
     deadlineText,
     deadlineDate,
-    ers: 0, // computed later (Phase 1E); 0 until analysis exists
+    ers: row.ers != null ? row.ers : 0, // Slice 6: computed from real evidence
+    ersBreakdown: row.ersBreakdown ? safeParse(row.ersBreakdown) : undefined,
     status: uiStatus,
     lastUpdated: new Date(row.updatedAt * 1000).toLocaleString('en-GB'),
     paymentContext: {

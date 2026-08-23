@@ -11,6 +11,7 @@ import { seedSimulatedDispute } from './dev/seed.js';
 import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification } from './repositories/evidence.js';
 import { listForDispute as listContradictions, detectAndStoreContradictions, markReviewed } from './repositories/contradictions.js';
 import { listForEvidence as listTimeline, listForDispute as listTimelineDispute, runTimelineExtraction } from './repositories/timeline.js';
+import { computeAndStoreErs, getErs, getGaps } from './repositories/ers.js';
 
 function safeJson(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
@@ -173,6 +174,27 @@ app.post('/api/evidence/:id/timeline', (req, res) => {
     const status = e.status || 500;
     res.status(status).json({ error: status === 404 ? 'not_found' : 'timeline_failed', message: e.message });
   }
+});
+
+// Slice 6 — Evidence Readiness Score (ERS) + gaps.
+app.post('/api/disputes/:id/ers/refresh', (req, res) => {
+  try {
+    res.json(computeAndStoreErs(req.params.id));
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({ error: status === 404 ? 'not_found' : 'ers_failed', message: e.message });
+  }
+});
+app.get('/api/disputes/:id/ers', (req, res) => {
+  try {
+    res.json(getErs(req.params.id));
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({ error: status === 404 ? 'not_found' : 'ers_failed', message: e.message });
+  }
+});
+app.get('/api/disputes/:id/gaps', (req, res) => {
+  res.json(getGaps(req.params.id));
 });
 
 // 404

@@ -169,6 +169,8 @@ addColumnIfMissing('evidence_documents', 'classificationMethod', 'TEXT');
 addColumnIfMissing('evidence_documents', 'classificationSource', 'TEXT');
 addColumnIfMissing('evidence_documents', 'classificationError', 'TEXT');
 addColumnIfMissing('evidence_documents', 'timelineStatus', 'TEXT');
+addColumnIfMissing('disputes', 'ers', 'INTEGER');
+addColumnIfMissing('disputes', 'ersBreakdown', 'TEXT');
 
 export function now() {
   return Math.floor(Date.now() / 1000);

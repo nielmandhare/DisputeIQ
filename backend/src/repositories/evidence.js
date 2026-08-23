@@ -7,6 +7,7 @@ import { extract, isSupportedMime } from '../services/extraction.js';
 import { classifyEvidence } from '../services/classifier.js';
 import { detectAndStoreContradictions } from '../repositories/contradictions.js';
 import { runTimelineExtraction } from '../repositories/timeline.js';
+import { computeAndStoreErs } from '../repositories/ers.js';
 import { recordAudit } from '../services/audit.js';
 
 const MAX_SIZE = Number(process.env.EVIDENCE_MAX_BYTES || 15 * 1024 * 1024); // 15 MB
@@ -70,6 +71,8 @@ export async function createEvidence(disputeId, file) {
     detectAndStoreContradictions(disputeId);
     // Slice 5: extract the grounded factual timeline from this document.
     await runTimelineExtraction(id);
+    // Slice 6: recompute the evidence-readiness score for the dispute.
+    computeAndStoreErs(disputeId);
   }
   return getEvidenceById(id);
 }
