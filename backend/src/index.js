@@ -1,11 +1,18 @@
 // Express server. Mounts the internal API the frontend consumes, the Razorpay
 // webhook endpoint (raw body required for HMAC), and a dev seed endpoint.
 import express from 'express';
+import multer from 'multer';
 import { config } from './config.js';
 import { handleWebhook } from './services/razorpay/webhooks.js';
 import { listDisputes, getDisputeById } from './repositories/disputes.js';
 import { listAuditForDispute, exportAuditCSV, exportAuditJSON } from './services/audit.js';
 import { seedSimulatedDispute } from './dev/seed.js';
+import { createEvidence, listForDispute, getEvidenceMeta } from './repositories/evidence.js';
+
+const upload = multer({
+  storage: multer.memoryStorage(), // we persist via StorageService, not multer disk
+  limits: { fileSize: Number(process.env.EVIDENCE_MAX_BYTES || 15 * 1024 * 1024), files: 10 },
+});
 
 const app = express();
 
@@ -65,6 +72,40 @@ app.post('/dev/seed-dispute', (_req, res) => {
   const result = seedSimulatedDispute();
   if (!result.ok) return res.status(result.status || 500).json(result);
   res.json(result);
+});
+
+// ---- Evidence pipeline (Slice 2) ----
+// POST /api/disputes/:id/evidence  (multipart, field "files")
+app.post('/api/disputes/:id/evidence', (req, res) => {
+  upload.array('files', 10)(req, res, async (err) => {
+    if (err) {
+      const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'file_too_large' : 'upload_error', message: err.message });
+    }
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'no_file', message: 'No file provided.' });
+    }
+    try {
+      const created = [];
+      for (const f of files) {
+        created.push(await createEvidence(req.params.id, f));
+      }
+      return res.status(201).json(created.length === 1 ? created[0] : created);
+    } catch (e) {
+      const status = e.status || 500;
+      const code = status === 404 ? 'dispute_not_found' : status === 415 ? 'unsupported_type' : status === 413 ? 'file_too_large' : 'upload_failed';
+      return res.status(status).json({ error: code, message: e.message });
+    }
+  });
+});
+app.get('/api/disputes/:id/evidence', (req, res) => {
+  res.json(listForDispute(req.params.id));
+});
+app.get('/api/evidence/:id', (req, res) => {
+  const ev = getEvidenceMeta(req.params.id);
+  if (!ev) return res.status(404).json({ error: 'not_found' });
+  res.json(ev);
 });
 
 // 404

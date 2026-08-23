@@ -58,6 +58,37 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS idx_disputes_rzpid  ON disputes(razorpayDisputeId);
 CREATE INDEX IF NOT EXISTS idx_disputes_status ON disputes(status);
 CREATE INDEX IF NOT EXISTS idx_audit_entity    ON audit_events(entityId, eventType);
+
+CREATE TABLE IF NOT EXISTS evidence_documents (
+  id               TEXT PRIMARY KEY,              -- ev_...
+  disputeId        TEXT NOT NULL,                 -- internal dispute id (disp_...)
+  filename         TEXT NOT NULL,                 -- original filename (display only)
+  safeName         TEXT NOT NULL,                 -- stored file name (uuid, no path)
+  mimeType         TEXT NOT NULL,
+  size             INTEGER NOT NULL,             -- bytes
+  storageLocation  TEXT NOT NULL,                 -- logical path (never fs-absolute to client)
+  processingStatus TEXT NOT NULL,                -- UPLOADED|PROCESSING|EXTRACTED|OCR_REQUIRED|EXTRACTION_FAILED|UNSUPPORTED
+  extractionMethod TEXT,                          -- TXT_DIRECT|JSON_PARSE|PDF_TEXT|OCR
+  extractedText    TEXT,                          -- may be large; detail endpoint only
+  extractionError  TEXT,                          -- error category/message (no stack)
+  characterCount   INTEGER,
+  pageCount        INTEGER,
+  processingMs     INTEGER,
+  createdAt   INTEGER NOT NULL,
+  updatedAt   INTEGER NOT NULL,
+  FOREIGN KEY (disputeId) REFERENCES disputes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_dispute ON evidence_documents(disputeId);
+
+CREATE TABLE IF NOT EXISTS processing_jobs (
+  id          TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  entityId    TEXT,
+  status      TEXT NOT NULL,
+  createdAt   INTEGER NOT NULL,
+  updatedAt   INTEGER NOT NULL
+);
 `);
 
 export function now() {

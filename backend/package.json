@@ -7,12 +7,17 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test"
+    "test": "bash test.sh"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "multer": "^2.2.0",
+    "pdfjs-dist": "^4.7.76"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "pdf-lib": "^1.17.1"
   }
 }
