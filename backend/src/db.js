@@ -109,6 +109,29 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
   createdAt   INTEGER NOT NULL,
   updatedAt   INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS contradictions (
+  id                TEXT PRIMARY KEY,             -- con_...
+  disputeId         TEXT NOT NULL,
+  type              TEXT NOT NULL,                -- chronological|amount|identity|status|address|other
+  severity          TEXT NOT NULL,                -- confirmed|possible|minor
+  claimA            TEXT NOT NULL,                -- verbatim span from doc A
+  sourceA           TEXT NOT NULL,                -- evidence id (doc A)
+  claimB            TEXT NOT NULL,                -- verbatim span from doc B
+  sourceB           TEXT NOT NULL,                -- evidence id (doc B)
+  explanation       TEXT NOT NULL,
+  recommendedAction TEXT,
+  confidence        INTEGER NOT NULL,             -- 0-100
+  method            TEXT NOT NULL,                -- LLM | HEURISTIC
+  model             TEXT,
+  reviewed          INTEGER NOT NULL DEFAULT 0,
+  createdAt         INTEGER NOT NULL,
+  FOREIGN KEY (disputeId) REFERENCES disputes(id) ON DELETE CASCADE,
+  FOREIGN KEY (sourceA) REFERENCES evidence_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (sourceB) REFERENCES evidence_documents(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_contradiction_dispute ON contradictions(disputeId);
 `);
 
 // Slice 3: classification columns on evidence_documents (idempotent adds, so

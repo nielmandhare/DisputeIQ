@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { storage } from '../services/storage.js';
 import { extract, isSupportedMime } from '../services/extraction.js';
 import { classifyEvidence } from '../services/classifier.js';
+import { detectAndStoreContradictions } from '../repositories/contradictions.js';
 import { recordAudit } from '../services/audit.js';
 
 const MAX_SIZE = Number(process.env.EVIDENCE_MAX_BYTES || 15 * 1024 * 1024); // 15 MB
@@ -64,6 +65,8 @@ export async function createEvidence(disputeId, file) {
   // Slice 3: classify the extracted (or OCR-queued) text.
   if (result.status === 'EXTRACTED') {
     await runClassification(id);
+    // Slice 4: re-run the contradiction engine now that a new extracted doc exists.
+    detectAndStoreContradictions(disputeId);
   }
   return getEvidenceById(id);
 }

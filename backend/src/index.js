@@ -9,6 +9,7 @@ import { listDisputes, getDisputeById } from './repositories/disputes.js';
 import { listAuditForDispute, exportAuditCSV, exportAuditJSON } from './services/audit.js';
 import { seedSimulatedDispute } from './dev/seed.js';
 import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification } from './repositories/evidence.js';
+import { listForDispute as listContradictions, detectAndStoreContradictions, markReviewed } from './repositories/contradictions.js';
 
 function safeJson(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
@@ -131,6 +132,24 @@ app.get('/api/evidence/:id/classification', (req, res) => {
     signals: safeJson(r.signals), sourceSpans: safeJson(r.sourceSpans), sourceText: r.sourceText,
     fallbackReason: r.fallbackReason || undefined, createdAt: new Date(r.createdAt * 1000).toISOString(),
   })));
+});
+
+// Slice 4 — Contradiction engine.
+app.get('/api/disputes/:id/contradictions', (req, res) => {
+  res.json(listContradictions(req.params.id));
+});
+// Re-run the contradiction detector across the dispute's evidence.
+app.post('/api/disputes/:id/contradictions/refresh', (req, res) => {
+  try {
+    res.json(detectAndStoreContradictions(req.params.id));
+  } catch (e) {
+    res.status(500).json({ error: 'detection_failed', message: e.message });
+  }
+});
+app.post('/api/contradictions/:id/review', (req, res) => {
+  const c = markReviewed(req.params.id, true);
+  if (!c) return res.status(404).json({ error: 'not_found' });
+  res.json(c);
 });
 
 // 404
