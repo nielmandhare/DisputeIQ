@@ -1,0 +1,65 @@
+// SQLite persistence via node:sqlite (Node >= 22).
+// Single connection, WAL mode, idempotent schema migration.
+import { DatabaseSync } from 'node:sqlite';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { config } from './config.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const dbPath = join(__dirname, '..', config.databasePath);
+
+export const db = new DatabaseSync(dbPath);
+db.exec('PRAGMA journal_mode = WAL;');
+db.exec('PRAGMA foreign_keys = ON;');
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS disputes (
+  id                    TEXT PRIMARY KEY,          -- internal id (disp_...)
+  razorpayDisputeId    TEXT UNIQUE NOT NULL,       -- Razorpay dispute id (dupu_...)
+  razorpayPaymentId    TEXT,
+  razorpayOrderId      TEXT,
+  amount               INTEGER,                    -- in paise
+  currency             TEXT,
+  reasonCode           TEXT,
+  reasonLabel          TEXT,
+  phase                TEXT,                       -- Razorpay lifecycle phase
+  status               TEXT,
+  createdAtRzp         INTEGER,                    -- Razorpay epoch seconds
+  deadlineRzp          INTEGER,                    -- Razorpay epoch seconds (may be null)
+  raw                  TEXT,                       -- raw Razorpay dispute JSON (debug/audit)
+  createdAt            INTEGER NOT NULL,
+  updatedAt            INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS webhook_events (
+  eventId            TEXT PRIMARY KEY,             -- Razorpay event id (evt_...)
+  eventType          TEXT NOT NULL,               -- payment.dispute.created, etc.
+  accountId          TEXT,
+  payload            TEXT,                        -- raw JSON payload
+  receivedAt         INTEGER NOT NULL,
+  status             TEXT NOT NULL,               -- RECEIVED | PROCESSED | FAILED | DUPLICATE
+  attempts           INTEGER NOT NULL DEFAULT 0,
+  error              TEXT,
+  processedAt        INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+  id          TEXT PRIMARY KEY,
+  timestamp   INTEGER NOT NULL,
+  actor       TEXT NOT NULL,                      -- RAZORPAY API | SYSTEM | MERCHANT | AI ENGINE
+  eventType   TEXT NOT NULL,
+  entityType  TEXT,
+  entityId    TEXT,
+  statusText  TEXT,
+  metadata    TEXT,                               -- JSON
+  requestId   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_disputes_rzpid  ON disputes(razorpayDisputeId);
+CREATE INDEX IF NOT EXISTS idx_disputes_status ON disputes(status);
+CREATE INDEX IF NOT EXISTS idx_audit_entity    ON audit_events(entityId, eventType);
+`);
+
+export function now() {
+  return Math.floor(Date.now() / 1000);
+}

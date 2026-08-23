@@ -1,0 +1,18 @@
+{
+  "name": "disputeiq-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DisputeIQ Phase 1 backend — Razorpay dispute ingestion, webhooks, state, audit. (Razorpay Buildathon 2026)",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
