@@ -1,0 +1,62 @@
+:root {
+  /* ===== Surfaces ===== */
+  --sidebar-bg: #0f172a;
+  --sidebar-bg-hover: #1e293b;
+  --sidebar-active: #1d4ed8;
+  --app-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --row-divider: #f1f5f9;
+
+  /* ===== Text ===== */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-on-dark: #e2e8f0;
+  --text-on-dark-muted: #94a3b8;
+
+  /* ===== Brand / Accent ===== */
+  --blue: #2563eb;
+  --blue-hover: #1d4ed8;
+  --blue-soft: #eff6ff;
+  --blue-border: #bfdbfe;
+
+  /* ===== Status ===== */
+  --amber: #f59e0b;
+  --amber-bg: #fef3c7;
+  --amber-border: #fcd34d;
+  --amber-text: #92400e;
+
+  --red: #dc2626;
+  --red-bg: #fee2e2;
+  --red-border: #fecaca;
+  --red-text: #991b1b;
+
+  --green: #16a34a;
+  --green-bg: #dcfce7;
+  --green-border: #bbf7d0;
+  --green-text: #166534;
+
+  --orange: #ea580c;
+  --orange-bg: #ffedd5;
+  --orange-border: #fed7aa;
+  --orange-text: #9a3412;
+
+  --grey-bg: #f1f5f9;
+  --grey-border: #e2e8f0;
+  --grey-text: #475569;
+
+  /* ===== Radii / Shadow ===== */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-pop: 0 10px 30px rgba(15, 23, 42, 0.18);
+
+  /* ===== Layout ===== */
+  --sidebar-w: 248px;
+  --topbar-h: 64px;
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+}
