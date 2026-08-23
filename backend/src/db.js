@@ -186,6 +186,28 @@ db.prepare(`CREATE TABLE IF NOT EXISTS response_drafts (
 )`).run();
 addColumnIfMissing('disputes', 'ers', 'INTEGER');
 addColumnIfMissing('disputes', 'ersBreakdown', 'TEXT');
+
+// Slice 8 — submission state machine (human-gated, never autonomous).
+db.prepare(`CREATE TABLE IF NOT EXISTS submissions (
+  id TEXT PRIMARY KEY,
+  disputeId TEXT NOT NULL,
+  draftId TEXT NOT NULL,
+  draftVersion INTEGER NOT NULL,
+  mode TEXT NOT NULL,
+  status TEXT NOT NULL,
+  httpStatus INTEGER,
+  razorpayStatus TEXT,
+  errorText TEXT,
+  evidenceUploaded TEXT,
+  requestId TEXT,
+  startedAt INTEGER NOT NULL,
+  completedAt INTEGER,
+  metadata TEXT
+)`).run();
+db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_submission_dispute_draft
+  ON submissions (disputeId, draftVersion, status)`).run();
+addColumnIfMissing('disputes', 'submissionStatus', 'TEXT');
+addColumnIfMissing('disputes', 'submittedAt', 'INTEGER');
 addColumnIfMissing('disputes', 'responseStatus', 'TEXT');
 
 export function now() {
