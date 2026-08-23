@@ -154,6 +154,7 @@ function toShape(r) {
     provider: r.provider || null,
     model: r.model || null,
     status: r.status,
+    valid: (safeParse(r.metrics)?.validationStatus || (r.status === 'DRAFT_READY')) === 'valid', // grounding validation result, independent of approval status
     draft: safeParse(r.draft),
     metrics: safeParse(r.metrics),
     fallbackUsed: Boolean(r.fallbackUsed),

@@ -21,12 +21,14 @@ class RazorpayError extends Error {
 }
 
 function authHeader() {
-  const token = Buffer.from(`${config.razorpay.keyId}:${config.razorpay.keySecret}`).toString('base64');
+  const token = Buffer.from(`${process.env.RAZORPAY_KEY_ID || config.razorpay.keyId}:${process.env.RAZORPAY_KEY_SECRET || config.razorpay.keySecret}`).toString('base64');
   return `Basic ${token}`;
 }
 
-async function request(path, { method = 'GET', retries = MAX_RETRIES } = {}) {
-  if (!config.razorpayConfigured) {
+async function request(path, { method = 'GET', body, headers = {}, retries = MAX_RETRIES } = {}) {
+  // Live credentials: read from process.env (supports runtime env toggling).
+  const configured = Boolean((process.env.RAZORPAY_KEY_ID || config.razorpay.keyId) && (process.env.RAZORPAY_KEY_SECRET || config.razorpay.keySecret));
+  if (!configured) {
     throw new RazorpayError('Razorpay credentials not configured (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET missing).', { code: 'NOT_CONFIGURED' });
   }
   const url = `${config.razorpay.apiBase}${path}`;
@@ -39,20 +41,21 @@ async function request(path, { method = 'GET', retries = MAX_RETRIES } = {}) {
     try {
       const res = await fetch(url, {
         method,
-        headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+        headers: { Authorization: authHeader(), 'Content-Type': 'application/json', ...headers },
+        body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
         signal: controller.signal,
       });
       const text = await res.text();
-      let body;
-      try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+      let parsed;
+      try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
       if (!res.ok) {
         // 4xx = caller error, do not retry. 5xx/timeout = retry.
         if (res.status >= 400 && res.status < 500) {
-          throw new RazorpayError(`Razorpay ${method} ${path} failed (${res.status})`, { status: res.status, code: body?.error?.code, raw: body });
+          throw new RazorpayError(`Razorpay ${method} ${path} failed (${res.status})`, { status: res.status, code: parsed?.error?.code, raw: parsed });
         }
-        throw new RazorpayError(`Razorpay ${method} ${path} returned ${res.status}`, { status: res.status, raw: body });
+        throw new RazorpayError(`Razorpay ${method} ${path} returned ${res.status}`, { status: res.status, raw: parsed });
       }
-      return body;
+      return parsed;
     } catch (err) {
       const transient = err.name === 'AbortError' || err.message?.includes('fetch failed') || (err.status && err.status >= 500);
       if (transient && attempt <= retries) {
@@ -76,8 +79,20 @@ export const razorpay = {
   async getDispute(id) {
     return request(`/disputes/${id}`);
   },
-  // NOTE: evidence submission (Phase 1G) is intentionally NOT implemented here yet.
-  // It is gated behind human approval and added in a later slice.
+  /**
+   * Upload an evidence document for a dispute (LIVE). Used during contest submission.
+   * NOTE: payload is minimal/documented-style and UNVERIFIED pending real test credentials.
+   */
+  async uploadDisputeDocument(razorpayDisputeId, payload) {
+    return request(`/disputes/${razorpayDisputeId}/documents`, { method: 'POST', body: payload });
+  },
+  /**
+   * Contest a dispute (LIVE). Submit the merchant response.
+   * NOTE: payload is minimal/documented-style and UNVERIFIED pending real test credentials.
+   */
+  async contestDispute(razorpayDisputeId, payload) {
+    return request(`/disputes/${razorpayDisputeId}/contest`, { method: 'POST', body: payload });
+  },
 };
 
 export { RazorpayError };

@@ -13,6 +13,7 @@ import { listForDispute as listContradictions, detectAndStoreContradictions, mar
 import { listForEvidence as listTimeline, listForDispute as listTimelineDispute, runTimelineExtraction } from './repositories/timeline.js';
 import { computeAndStoreErs, getErs, getGaps } from './repositories/ers.js';
 import { generateForDispute, getLatest, approveDraft } from './repositories/responseDraft.js';
+import { submitDispute, getSubmission } from './services/submission.js';
 
 function safeJson(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
@@ -221,6 +222,24 @@ app.post('/api/disputes/:id/draft/approve', (req, res) => {
     const status = e.status || 500;
     res.status(status).json({ error: status === 404 ? 'not_found' : 'approve_failed', message: e.message });
   }
+});
+
+// Slice 8 — Human-gated Razorpay contest submission.
+// Triggered ONLY by an explicit human action. The backend re-verifies every
+// precondition and enforces idempotency. The AI never invokes this.
+app.post('/api/disputes/:id/submit', async (req, res) => {
+  try {
+    const result = await submitDispute(req.params.id, { actor: 'HUMAN' });
+    res.status(200).json(result);
+  } catch (e) {
+    const status = e.code === 'REQUIRES_REVIEW' ? 409 : (e.status || 422);
+    res.status(status).json({ error: e.code || 'submission_failed', message: e.message });
+  }
+});
+app.get('/api/disputes/:id/submission', (req, res) => {
+  const s = getSubmission(req.params.id);
+  if (!s) return res.status(404).json({ error: 'no_submission' });
+  res.json(s);
 });
 
 // 404
