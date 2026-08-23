@@ -169,8 +169,24 @@ addColumnIfMissing('evidence_documents', 'classificationMethod', 'TEXT');
 addColumnIfMissing('evidence_documents', 'classificationSource', 'TEXT');
 addColumnIfMissing('evidence_documents', 'classificationError', 'TEXT');
 addColumnIfMissing('evidence_documents', 'timelineStatus', 'TEXT');
+// Slice 7 — response drafts (human-reviewable, never auto-submitted).
+db.prepare(`CREATE TABLE IF NOT EXISTS response_drafts (
+  id TEXT PRIMARY KEY,
+  disputeId TEXT NOT NULL,
+  draftVersion INTEGER NOT NULL,
+  generationMethod TEXT NOT NULL,
+  provider TEXT,
+  model TEXT,
+  status TEXT NOT NULL,
+  draft TEXT NOT NULL,
+  metrics TEXT,
+  fallbackUsed INTEGER DEFAULT 0,
+  createdAt INTEGER NOT NULL,
+  updatedAt INTEGER NOT NULL
+)`).run();
 addColumnIfMissing('disputes', 'ers', 'INTEGER');
 addColumnIfMissing('disputes', 'ersBreakdown', 'TEXT');
+addColumnIfMissing('disputes', 'responseStatus', 'TEXT');
 
 export function now() {
   return Math.floor(Date.now() / 1000);

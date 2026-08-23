@@ -59,6 +59,7 @@ export function rowToDispute(row) {
     deadlineDate,
     ers: row.ers != null ? row.ers : 0, // Slice 6: computed from real evidence
     ersBreakdown: row.ersBreakdown ? safeParse(row.ersBreakdown) : undefined,
+    responseStatus: row.responseStatus || null, // Slice 7: DRAFT_READY / APPROVED / null
     status: uiStatus,
     lastUpdated: new Date(row.updatedAt * 1000).toLocaleString('en-GB'),
     paymentContext: {

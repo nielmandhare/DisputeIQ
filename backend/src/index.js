@@ -12,6 +12,7 @@ import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runCl
 import { listForDispute as listContradictions, detectAndStoreContradictions, markReviewed } from './repositories/contradictions.js';
 import { listForEvidence as listTimeline, listForDispute as listTimelineDispute, runTimelineExtraction } from './repositories/timeline.js';
 import { computeAndStoreErs, getErs, getGaps } from './repositories/ers.js';
+import { generateForDispute, getLatest, approveDraft } from './repositories/responseDraft.js';
 
 function safeJson(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
@@ -195,6 +196,31 @@ app.get('/api/disputes/:id/ers', (req, res) => {
 });
 app.get('/api/disputes/:id/gaps', (req, res) => {
   res.json(getGaps(req.params.id));
+});
+
+// Slice 7 — Grounded dispute response drafting (DRAFT ONLY; never submits).
+app.post('/api/disputes/:id/draft', async (req, res) => {
+  try {
+    const draft = await generateForDispute(req.params.id);
+    res.status(201).json(draft);
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({ error: status === 404 ? 'not_found' : 'draft_failed', message: e.message });
+  }
+});
+app.get('/api/disputes/:id/draft', (req, res) => {
+  const draft = getLatest(req.params.id);
+  if (!draft) return res.status(404).json({ error: 'no_draft' });
+  res.json(draft);
+});
+// Human approval of a draft (does NOT submit to Razorpay; submission is Slice 8).
+app.post('/api/disputes/:id/draft/approve', (req, res) => {
+  try {
+    res.json(approveDraft(req.params.id));
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({ error: status === 404 ? 'not_found' : 'approve_failed', message: e.message });
+  }
 });
 
 // 404
