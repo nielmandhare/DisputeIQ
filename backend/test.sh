@@ -8,4 +8,5 @@ node --test tests/webhook.test.js
 node --test tests/evidence.test.js
 node --test tests/classification.test.js
 node --test tests/contradiction.test.js
+node --test tests/timeline.test.js
 rm -f .test.db .test.db-wal .test.db-shm
