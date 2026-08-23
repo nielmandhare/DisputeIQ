@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { IconWarn, IconCheck } from './Icons';
 
-type Kind = 'red' | 'amber' | 'blue' | 'orange';
+type Kind = 'red' | 'amber' | 'blue' | 'orange' | 'green';
 export function Alert({ kind, children, icon, style }: { kind: Kind; children: ReactNode; icon?: 'warn' | 'check'; style?: React.CSSProperties }) {
   const ic = icon === 'check' ? <IconCheck size={16} /> : <IconWarn size={16} />;
   return (

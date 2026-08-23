@@ -33,8 +33,12 @@ export default function Sidebar() {
       <div className="nav-spacer" />
 
       <nav className="nav-section">
-        <div className="nav-item"><span className="ic"><IconSettings size={18} /></span><span>Settings</span></div>
-        <div className="nav-item"><span className="ic"><IconHelp size={18} /></span><span>Help &amp; Docs</span></div>
+        <NavLink to="/settings" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+          <span className="ic"><IconSettings size={18} /></span><span>Settings</span>
+        </NavLink>
+        <NavLink to="/help" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+          <span className="ic"><IconHelp size={18} /></span><span>Help &amp; Docs</span>
+        </NavLink>
       </nav>
 
       <div className="sidebar-footer">

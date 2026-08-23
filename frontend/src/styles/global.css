@@ -121,6 +121,10 @@ ul { list-style: none; }
 .btn-outline:hover { background: var(--blue-soft); }
 .btn-ghost { background: #fff; color: var(--text-secondary); border: 1px solid var(--card-border); }
 .btn-ghost:hover { background: var(--grey-bg); }
+.btn-danger { background: var(--red); color: #fff; border: 1px solid var(--red); }
+.btn-danger:hover { background: #b91c1c; }
+.btn-danger-outline { background: #fff; color: var(--red-text); border: 1px solid var(--red-border); }
+.btn-danger-outline:hover { background: var(--red-bg); }
 .btn-block { width: 100%; justify-content: center; }
 .btn-lg { padding: 13px 22px; font-size: 15px; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
@@ -177,12 +181,43 @@ table.grid tbody tr:hover { background: #f8fafc; }
 .alert-amber { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber-text); }
 .alert-blue { background: var(--blue-soft); border: 1px solid var(--blue-border); color: var(--blue); }
 .alert-orange { background: var(--orange-bg); border: 1px solid var(--orange-border); color: var(--orange-text); }
+.alert-green { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green-text); }
 .alert .ai { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
 
 /* ===== Select (filters) ===== */
 select.btn { -webkit-appearance: none; appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%), linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
 
-/* ===== Misc ===== */
+/* ===== Settings / Help ===== */
+.setting-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--row-divider); }
+.setting-row:last-child { border-bottom: none; }
+.setting-row .label { font-weight: 600; margin-bottom: 3px; }
+.setting-row .desc { font-size: 13px; color: var(--text-secondary); max-width: 520px; line-height: 1.5; }
+
+/* toggle switch */
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; border-radius: 999px; transition: 0.2s; }
+.switch .slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.switch input:checked + .slider { background: var(--blue); }
+.switch input:checked + .slider::before { transform: translateX(20px); }
+
+/* doc / help cards */
+.doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.doc-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px; text-decoration: none; color: inherit; display: block; transition: 0.15s; }
+.doc-card:hover { border-color: var(--blue-border); box-shadow: var(--shadow-card); transform: translateY(-1px); }
+.doc-card .doc-title { font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.doc-card .doc-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.doc-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--blue-soft); color: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+
+.faq-item { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.faq-q { width: 100%; text-align: left; background: none; border: none; padding: 14px 18px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--text-primary); }
+.faq-q:hover { background: var(--row-divider); }
+.faq-a { padding: 0 18px 16px; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.faq-chev { transition: 0.2s; color: var(--text-muted); }
+.faq-item.open .faq-chev { transform: rotate(180deg); }
+
+.kv { font-size: 13px; color: var(--text-secondary); }
+.kv b { color: var(--text-primary); font-weight: 600; }
 .row { display: flex; align-items: center; gap: 12px; }
 .between { justify-content: space-between; }
 .wrap { flex-wrap: wrap; }
