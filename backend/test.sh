@@ -10,4 +10,5 @@ node --test tests/classification.test.js
 node --test tests/contradiction.test.js
 node --test tests/timeline.test.js
 node --test tests/ers.test.js
+node --test tests/responseDraft.test.js
 rm -f .test.db .test.db-wal .test.db-shm
