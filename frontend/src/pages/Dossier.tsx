@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { disputeService, timelineService } from '../services/mockServices';
-import { Dispute, TimelineEvent } from '../types';
+import { disputeService, timelineService, responseDraftService } from '../services/mockServices';
+import { Dispute, TimelineEvent, ResponseDraft } from '../types';
 
 function humanizeType(t: string) {
   return t.split('_').map((w) => w[0] + w.slice(1).toLowerCase()).join(' ');
@@ -15,9 +15,23 @@ export default function Dossier() {
   const { id = 'disp_test_8K72' } = useParams();
   const [d, setD] = useState<Dispute | undefined>();
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [draft, setDraft] = useState<ResponseDraft | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [approving, setApproving] = useState(false);
   const [raw, setRaw] = useState(false);
   useEffect(() => { disputeService.getById(id).then(setD); }, [id]);
   useEffect(() => { timelineService.listForDispute(id).then(setTimeline); }, [id]);
+  useEffect(() => { responseDraftService.getLatest(id).then(setDraft); }, [id]);
+
+  const generate = async () => {
+    setGenerating(true);
+    try { setDraft(await responseDraftService.generate(id)); } finally { setGenerating(false); }
+  };
+  const approve = async () => {
+    setApproving(true);
+    try { setDraft(await responseDraftService.approve(id)); } finally { setApproving(false); }
+  };
+
   if (!d) return <div className="muted">Loading…</div>;
 
   return (
@@ -106,7 +120,7 @@ export default function Dossier() {
         ))}
 
         <div className="divider" />
-        <div className="card-title" style={{ marginBottom: 8, color: 'var(--orange-text)' }}>IV. Unresolved Contradictions</div>
+        <div className="card-title" style={{ marginBottom: 8 }}>IV. Unresolved Contradictions</div>
         <div style={{ color: 'var(--orange-text)' }}>
           {((d.contradictions ?? []).length > 0) ? (
             <>
@@ -119,7 +133,98 @@ export default function Dossier() {
             <span>No unresolved contradictions detected across the submitted evidence.</span>
           )}
         </div>
+
+        <div className="divider" />
+        <div className="card-title" style={{ marginBottom: 8 }}>V. AI-Generated Response Draft</div>
+        {!draft && (
+          <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+            <span className="muted" style={{ fontSize: 13 }}>No draft generated yet. The draft is assembled only from the verified evidence above.</span>
+            <button className="btn btn-primary" onClick={generate} disabled={generating}>{generating ? 'Generating…' : 'Generate Response'}</button>
+          </div>
+        )}
+        {draft && (
+          <div>
+            <div className="row between" style={{ marginBottom: 10 }}>
+              <div className="row" style={{ gap: 8 }}>
+                <span className={`badge ${draft.status === 'DRAFT_APPROVED' ? 'badge-green' : 'badge-blue'}`}>
+                  {draft.status === 'DRAFT_APPROVED' ? 'Human-Approved' : draft.status === 'DRAFT_READY' ? 'Ready for review' : 'Review required'}
+                </span>
+                <span className="badge badge-grey">{draft.generationMethod}{draft.fallbackUsed ? ' (heuristic fallback)' : ''}{draft.metrics ? ` · ${draft.metrics.coverage}% grounded` : ''}</span>
+              </div>
+              <div className="row" style={{ gap: 8 }}>
+                <button className="btn btn-ghost" onClick={generate} disabled={generating}>{generating ? 'Regenerating…' : 'Regenerate'}</button>
+                {draft.status !== 'DRAFT_APPROVED' && (
+                  <button className="btn btn-primary" onClick={approve} disabled={approving}>{approving ? 'Approving…' : 'Approve Draft'}</button>
+                )}
+              </div>
+            </div>
+            <DraftSection title="Dispute Summary" section={draft.draft.summary} />
+            <DraftSection title="Merchant Position" section={draft.draft.merchantPosition} />
+            <div className="card-title" style={{ margin: '14px 0 6px', fontSize: 14 }}>Chronology</div>
+            {draft.draft.chronology.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No timeline events available to summarize.</div>}
+            {draft.draft.chronology.map((c, i) => (
+              <div key={c.eventId || i} style={{ padding: '8px 0', borderBottom: '1px solid var(--row-divider)' }}>
+                <div style={{ fontWeight: 600 }}>{c.text}</div>
+                <SourceChips sources={c.sources} />
+              </div>
+            ))}
+            <div className="card-title" style={{ margin: '14px 0 6px', fontSize: 14 }}>Supporting Evidence</div>
+            {draft.draft.supportingEvidence.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No classified evidence to cite.</div>}
+            {draft.draft.supportingEvidence.map((s, i) => (
+              <div key={s.documentId || i} style={{ padding: '8px 0', borderBottom: '1px solid var(--row-divider)' }}>
+                <div style={{ fontWeight: 600 }}>{s.reason}</div>
+                <SourceChips sources={s.sources} />
+              </div>
+            ))}
+            {draft.draft.contradictions.length > 0 && (
+              <>
+                <div className="card-title" style={{ margin: '14px 0 6px', fontSize: 14, color: 'var(--orange-text)' }}>Contradictions / Relevant Findings</div>
+                {draft.draft.contradictions.map((c, i) => (
+                  <div key={c.contradictionId || i} style={{ padding: '8px 0', borderBottom: '1px solid var(--row-divider)', color: 'var(--orange-text)' }}>
+                    <div>{c.text}</div>
+                    <SourceChips sources={c.sources} />
+                  </div>
+                ))}
+              </>
+            )}
+            {draft.draft.evidenceGaps.length > 0 && (
+              <>
+                <div className="card-title" style={{ margin: '14px 0 6px', fontSize: 14 }}>Evidence Gaps</div>
+                {draft.draft.evidenceGaps.map((g, i) => (
+                  <div key={i} style={{ padding: '6px 0', color: 'var(--orange-text)' }}>{g.text}</div>
+                ))}
+              </>
+            )}
+            <DraftSection title="Requested Resolution" section={draft.draft.requestedResolution} />
+            <div className="muted" style={{ fontSize: 11, marginTop: 12 }}>
+              Generated by DisputeIQ from verified evidence. The human remains the final decision-maker; approval does not submit to Razorpay (submission is a separate step).
+            </div>
+          </div>
+        )}
       </div>
     </>
+  );
+}
+
+function SourceChips({ sources }: { sources: { documentId?: string | null; sourceDocument?: string | null; sourceLocation?: string | null }[] }) {
+  if (!sources || sources.length === 0) return <span className="muted" style={{ fontSize: 11 }}>[no source]</span>;
+  return (
+    <div className="row" style={{ gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+      {sources.map((s, i) => (
+        <span key={i} className="badge badge-grey" style={{ fontSize: 11 }}>
+          {s.sourceDocument || 'evidence'} {s.sourceLocation ? `· ${s.sourceLocation}` : ''}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DraftSection({ title, section }: { title: string; section: { text: string; sources: { documentId?: string | null; sourceDocument?: string | null; sourceLocation?: string | null }[] } }) {
+  return (
+    <div style={{ margin: '12px 0' }}>
+      <div className="card-title" style={{ fontSize: 14, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 14 }}>{section.text}</div>
+      <SourceChips sources={section.sources} />
+    </div>
   );
 }

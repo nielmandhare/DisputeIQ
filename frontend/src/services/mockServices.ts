@@ -1,7 +1,25 @@
-import { AuditEvent, Contradiction, Dispute, EvidenceDocument, GapItem, ErsBreakdown, TimelineEvent } from '../types';
+import { AuditEvent, Contradiction, Dispute, EvidenceDocument, GapItem, ErsBreakdown, TimelineEvent, ResponseDraft } from '../types';
 import {
   DEMO_DISPUTES, DEMO_DOCS, DEMO_GAPS, DEMO_ERS, DEMO_AUDIT, DEMO_CONTRADICTION, OCR_ISSUE_DOC, OVERVIEW_STATS,
 } from '../data/mockData';
+
+// Mock fallback draft (Slice 7) — used only if the backend is unreachable.
+const MOCK_DRAFT: Partial<ResponseDraft> = {
+  draftVersion: 1,
+  generationMethod: 'HEURISTIC',
+  provider: 'heuristic',
+  status: 'DRAFT_READY',
+  fallbackUsed: false,
+  draft: {
+    summary: { text: 'This dispute relates to a chargeback on a delivered order. Evidence has been analyzed.', sources: [] },
+    merchantPosition: { text: 'The available evidence indicates the order was delivered to the customer.', sources: [] },
+    chronology: [],
+    supportingEvidence: [],
+    contradictions: [],
+    evidenceGaps: [],
+    requestedResolution: { text: 'The merchant requests review of the attached delivery records.', sources: [] },
+  },
+};
 
 // ============================================================================
 // SERVICE ABSTRACTION LAYER
@@ -22,6 +40,25 @@ async function apiGet<T>(path: string, timeoutMs = 2500): Promise<T | null> {
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${API_BASE}${path}`, { signal: controller.signal });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null; // network/timeout -> fallback to mock
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function apiPost<T>(path: string, body: unknown, timeoutMs = 5000): Promise<T | null> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -185,6 +222,27 @@ export const ersService = {
     await delay(80);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     return d?.ersBreakdown ?? DEMO_ERS;
+  },
+};
+
+// Slice 7 — grounded response drafting (DRAFT ONLY; never submits).
+export const responseDraftService = {
+  async generate(id: string): Promise<ResponseDraft> {
+    const live = await apiPost<ResponseDraft>(`/api/disputes/${id}/draft`, {});
+    if (live) return live;
+    await delay(150);
+    return MOCK_DRAFT as ResponseDraft;
+  },
+  async getLatest(id: string): Promise<ResponseDraft | null> {
+    const live = await apiGet<ResponseDraft>(`/api/disputes/${id}/draft`);
+    if (live) return live;
+    return null;
+  },
+  async approve(id: string): Promise<ResponseDraft> {
+    const live = await apiPost<ResponseDraft>(`/api/disputes/${id}/draft/approve`, {});
+    if (live) return live;
+    await delay(120);
+    return { ...(MOCK_DRAFT as ResponseDraft), status: 'DRAFT_APPROVED' };
   },
 };
 

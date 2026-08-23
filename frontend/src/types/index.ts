@@ -158,6 +158,62 @@ export interface Dispute {
   contradictions?: Contradiction[];
   gaps?: GapItem[];
   ersBreakdown?: ErsBreakdown;
+  responseStatus?: 'DRAFT_READY' | 'DRAFT_REVIEW_REQUIRED' | 'APPROVED' | null;
   paymentContext?: { paymentId: string; orderId: string; timestamp: string; method: string };
   audit?: AuditEvent[];
+}
+
+// Slice 7 — grounded response draft (DRAFT ONLY; never submitted by this slice).
+export interface DraftSourceRef {
+  documentId?: string | null;
+  sourceDocument?: string | null;
+  sourceLocation?: string | null;
+}
+export interface DraftSection {
+  text: string;
+  sources: DraftSourceRef[];
+}
+export interface DraftChronologyItem extends DraftSection {
+  eventId?: string;
+  eventType?: string;
+}
+export interface DraftSupportingItem {
+  documentId?: string;
+  evidenceType?: string;
+  reason: string;
+  sources: DraftSourceRef[];
+}
+export interface DraftContradictionItem {
+  contradictionId?: string;
+  text: string;
+  sources: DraftSourceRef[];
+}
+export interface DraftMetrics {
+  sourceCount: number;
+  claimCount: number;
+  groundedCount: number;
+  coverage: number; // grounded claim coverage %
+  validationStatus: string;
+}
+export interface ResponseDraft {
+  id: string;
+  disputeId: string;
+  draftVersion: number;
+  generationMethod: 'HEURISTIC' | 'LLM';
+  provider: string | null;
+  model: string | null;
+  status: 'DRAFT_READY' | 'DRAFT_REVIEW_REQUIRED' | 'DRAFT_APPROVED' | 'DRAFT_FAILED';
+  draft: {
+    summary: DraftSection;
+    merchantPosition: DraftSection;
+    chronology: DraftChronologyItem[];
+    supportingEvidence: DraftSupportingItem[];
+    contradictions: DraftContradictionItem[];
+    evidenceGaps: DraftSection[];
+    requestedResolution: DraftSection;
+  };
+  metrics?: DraftMetrics;
+  fallbackUsed: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
