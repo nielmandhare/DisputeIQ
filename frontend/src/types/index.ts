@@ -63,6 +63,21 @@ export interface ExtractedFact {
   status: 'VERIFIED' | 'NEEDS_REVIEW';
 }
 
+// Slice 5 — grounded factual timeline event (mirrors backend factual_events).
+export interface TimelineEvent {
+  id: string;
+  evidenceId: string;
+  eventType: string; // one of EVENT_TYPES
+  date: string | null; // ISO YYYY-MM-DD (null if not determinable)
+  time: string | null; // HH:MM (null if not present)
+  datePrecision: 'datetime' | 'date' | 'month' | 'unknown';
+  actor: string | null; // courier | customer | merchant | bank | system | null
+  description: string;
+  sourceDocument: string;
+  sourceLocation: string | null; // e.g. "Line 14" / "Lines 14-16" / null
+  confidence: number; // 0-100
+}
+
 export interface EvidenceDocument {
   id: string;
   fileName: string;

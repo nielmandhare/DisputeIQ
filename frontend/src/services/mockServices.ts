@@ -1,4 +1,4 @@
-import { AuditEvent, Contradiction, Dispute, EvidenceDocument, GapItem, ErsBreakdown } from '../types';
+import { AuditEvent, Contradiction, Dispute, EvidenceDocument, GapItem, ErsBreakdown, TimelineEvent } from '../types';
 import {
   DEMO_DISPUTES, DEMO_DOCS, DEMO_GAPS, DEMO_ERS, DEMO_AUDIT, DEMO_CONTRADICTION, OCR_ISSUE_DOC, OVERVIEW_STATS,
 } from '../data/mockData';
@@ -149,6 +149,22 @@ export const contradictionService = {
       if (res.ok) return await res.json();
     } catch { /* ignore */ }
     return null;
+  },
+};
+
+// Slice 5 — grounded factual timeline. Backend is source of truth; mock fallback.
+export const timelineService = {
+  async listForDispute(id: string): Promise<TimelineEvent[]> {
+    const live = await apiGet<TimelineEvent[]>(`/api/disputes/${id}/timeline`);
+    if (live) return live;
+    await delay(100);
+    return [];
+  },
+  async listForEvidence(evId: string): Promise<TimelineEvent[]> {
+    const live = await apiGet<TimelineEvent[]>(`/api/evidence/${evId}/timeline`);
+    if (live) return live;
+    await delay(100);
+    return [];
   },
 };
 
