@@ -11,7 +11,7 @@ const DOCS = [
 
 const FAQS = [
   { q: 'What is DisputeIQ?', a: 'DisputeIQ is an AI-assisted dispute management workspace for Razorpay merchants. It ingests dispute evidence, classifies documents, detects contradictions, scores evidence readiness, and prepares a submission-ready dossier.' },
-  { q: 'Is this using real Razorpay data?', a: 'In this demo, webhook delivery and document upload are simulated. The DEMO MODE banner confirms this. All other API calls are designed to use real Razorpay test credentials (test mode) once the backend is connected.' },
+  { q: 'Is this using real Razorpay data?', a: 'Inbound Razorpay webhooks are simulated in this demo (no live keys). Evidence upload and PDF/TXT/JSON text extraction run on the real backend. Once real Razorpay test-mode keys are added, the webhook path uses the same verified pipeline.' },
   { q: 'How is the Evidence Readiness Score calculated?', a: 'ERS = (required evidence present × weight) + (recommended evidence complete × weight) − (contradiction penalty). It is a predictive indicator, not a guarantee of outcome. A full breakdown is shown on each dispute’s detail and gaps screens.' },
   { q: 'What does a detected contradiction mean?', a: 'The AI found a timeline or logic conflict between two documents — for example a return initiated (March 12) before a delivery was confirmed (March 15). You should investigate and either attach a clarifying communication or mark it reviewed with a merchant memo.' },
   { q: 'Can I export the audit trail?', a: 'Yes. The Audit Trail screen supports exporting the full event log as CSV or JSON for compliance records.' },

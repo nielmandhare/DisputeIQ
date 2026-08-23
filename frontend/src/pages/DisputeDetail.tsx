@@ -30,9 +30,12 @@ export default function DisputeDetail() {
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     setUploading(true);
-    const added = await evidenceService.upload(id, Array.from(e.target.files));
-    setDocs((prev) => [...prev, ...added]);
-    setTimeout(() => setUploading(false), 1200);
+    await evidenceService.upload(id, Array.from(e.target.files));
+    // Re-fetch the real backend evidence list to reflect processing status.
+    const refreshed = await evidenceService.listForDispute(id);
+    setDocs(refreshed);
+    setUploading(false);
+    if (e.target) e.target.value = '';
   };
 
   return (
@@ -83,25 +86,42 @@ export default function DisputeDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card card-pad">
             <div className="card-title-row">
-              <span className="card-title">Evidence Documents · {docs.length} documents · {docs.filter((x) => x.statusLabel === 'ANALYZED').length} analyzed</span>
+              <span className="card-title">Evidence Documents · {docs.length} documents · {docs.filter((x) => x.ingestionStatus === 'EXTRACTED').length} ready</span>
               <label className="btn btn-outline" style={{ cursor: 'pointer' }}>
                 + Add Evidence
                 <input type="file" multiple hidden onChange={onUpload} />
               </label>
             </div>
             {docs.map((doc) => (
-              <div key={doc.id} className="row between" style={{ padding: '11px 0', borderBottom: '1px solid var(--row-divider)' }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{doc.fileName}</div>
-                  <div className="badge badge-grey" style={{ marginTop: 4 }}>{doc.badgeLabel}</div>
-                </div>
-                <div className="row" style={{ gap: 14 }}>
-                  {doc.confidence != null && <ConfidenceBar value={doc.confidence} />}
-                  <span className={`badge ${doc.statusLabel === 'CONTRADICTION' ? 'badge-red' : 'badge-green'}`}>{doc.statusLabel}</span>
+              <div key={doc.id} style={{ padding: '11px 0', borderBottom: '1px solid var(--row-divider)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{doc.fileName}</div>
+                    <div className="row" style={{ marginTop: 4, gap: 8, flexWrap: 'wrap' }}>
+                      <span className="badge badge-grey">{doc.badgeLabel}</span>
+                      <span className="muted" style={{ fontSize: 12 }}>{doc.size}</span>
+                    </div>
+                    {doc.contentPreview && doc.contentPreview.length > 0 && (
+                      <div className="muted" style={{ fontSize: 12, marginTop: 6, maxWidth: 520 }}>
+                        {doc.contentPreview[0].slice(0, 160)}
+                      </div>
+                    )}
+                    {doc.ingestionStatus === 'EXTRACTION_FAILED' && (
+                      <div className="badge badge-red" style={{ marginTop: 6 }}>Unable to extract — {doc.statusLabel}</div>
+                    )}
+                    {doc.ingestionStatus === 'OCR_REQUIRED' && (
+                      <div className="badge badge-orange" style={{ marginTop: 6 }}>OCR required — PDF appears image-only</div>
+                    )}
+                  </div>
+                  <div className="row" style={{ gap: 14 }}>
+                    {doc.confidence != null && <ConfidenceBar value={doc.confidence} />}
+                    <span className={`badge ${doc.ingestionStatus === 'EXTRACTION_FAILED' ? 'badge-red' : doc.ingestionStatus === 'OCR_REQUIRED' ? 'badge-orange' : doc.ingestionStatus === 'EXTRACTED' ? 'badge-green' : 'badge-grey'}`}>{doc.statusLabel}</span>
+                  </div>
                 </div>
               </div>
             ))}
-            {uploading && <div className="muted" style={{ paddingTop: 10 }}>Uploading &amp; analyzing…</div>}
+            {docs.length === 0 && <div className="muted" style={{ paddingTop: 10 }}>No evidence uploaded yet.</div>}
+            {uploading && <div className="muted" style={{ paddingTop: 10 }}>Processing document…</div>}
           </div>
 
           <div className="card card-pad">

@@ -72,24 +72,52 @@ export const disputeService = {
 
 export const evidenceService = {
   async listForDispute(id: string): Promise<EvidenceDocument[]> {
+    const live = await apiGet<EvidenceDocument[]>(`/api/disputes/${id}/evidence`);
+    if (live) return live.map(toUiEvidence);
     await delay(100);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     return d?.documents ?? DEMO_DOCS;
   },
-  // Mock file upload: stores filename in local state, no real upload.
-  async upload(_id: string, files: File[]): Promise<EvidenceDocument[]> {
+  // Real upload: multipart POST to backend. Falls back to mock if backend down.
+  async upload(id: string, files: File[]): Promise<EvidenceDocument[]> {
+    const fd = new FormData();
+    files.forEach((f) => fd.append('files', f));
+    try {
+      const res = await fetch(`${API_BASE}/api/disputes/${id}/evidence`, { method: 'POST', body: fd });
+      if (res.ok) {
+        const data = await res.json();
+        const arr = Array.isArray(data) ? data : [data];
+        return arr.map(toUiEvidence);
+      }
+    } catch { /* fall through to mock */ }
     await delay(500);
-    const added: EvidenceDocument[] = files.map((f, i) => ({
+    return files.map((f, i) => ({
       id: `up_${Date.now()}_${i}`,
       fileName: f.name,
       size: `${(f.size / 1024).toFixed(0)} KB`,
       badgeLabel: 'UPLOADED',
-      ingestionStatus: 'PROCESSING',
+      ingestionStatus: 'PROCESSING' as const,
       statusLabel: 'PROCESSING',
     }));
-    return added;
   },
 };
+
+// Map backend EvidenceDocument -> frontend EvidenceDocument shape.
+function toUiEvidence(e: any): EvidenceDocument {
+  return {
+    id: e.id,
+    fileName: e.fileName,
+    size: e.size,
+    badgeLabel: e.extractionMethod || e.processingStatus,
+    ingestionStatus: e.processingStatus,
+    statusLabel: e.statusLabel,
+    extractionMethod: e.extractionMethod?.toLowerCase().includes('pdf') ? 'pdf_text' : undefined,
+    evidenceType: undefined, // classification is Slice 3
+    confidence: undefined,   // scoring is Slice 3
+    contentPreview: e.extractedPreview ? e.extractedPreview.split('\n').slice(0, 3) : undefined,
+    reviewed: false,
+  };
+}
 
 export const contradictionService = {
   async listForDispute(id: string): Promise<Contradiction[]> {

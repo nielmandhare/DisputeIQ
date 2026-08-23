@@ -10,7 +10,7 @@ export default function TopBar({ breadcrumbs }: TopBarProps) {
     <header className="topbar">
       <div className="breadcrumbs">{breadcrumbs}</div>
       <div className="demo-banner">
-        DEMO MODE — Webhook and document upload are simulated. All other API calls use real Razorpay test credentials.
+        DEMO MODE — Inbound Razorpay webhooks are simulated (no live keys). Evidence upload & text extraction run on the real backend.
       </div>
       <div className="topbar-right">
         <span className="bell"><IconBell size={18} /></span>
