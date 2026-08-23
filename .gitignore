@@ -11,3 +11,16 @@ backend/*.db-wal
 backend/*.db-shm
 backend/storage/
 backend/.env
+
+# Evidence storage + test artifacts
+backend/storage/
+backend/.work/storage_test/
+backend/.test.db
+backend/.test.db-wal
+backend/.test.db-shm
+backend/test.db
+backend/test2.db
+backend/test3.db
+backend/test4.db
+backend/test5.db
+backend/test_run.db
