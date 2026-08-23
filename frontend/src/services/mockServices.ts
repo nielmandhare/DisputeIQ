@@ -130,9 +130,25 @@ function toUiEvidence(e: any): EvidenceDocument {
 
 export const contradictionService = {
   async listForDispute(id: string): Promise<Contradiction[]> {
+    const live = await apiGet<Contradiction[]>(`/api/disputes/${id}/contradictions`);
+    if (live) return live;
     await delay(100);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     return d?.contradictions ?? [DEMO_CONTRADICTION];
+  },
+  async refresh(id: string): Promise<Contradiction[]> {
+    try {
+      const res = await fetch(`${API_BASE}/api/disputes/${id}/contradictions/refresh`, { method: 'POST' });
+      if (res.ok) return await res.json();
+    } catch { /* ignore */ }
+    return this.listForDispute(id);
+  },
+  async review(conId: string): Promise<Contradiction | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/contradictions/${conId}/review`, { method: 'POST' });
+      if (res.ok) return await res.json();
+    } catch { /* ignore */ }
+    return null;
   },
 };
 

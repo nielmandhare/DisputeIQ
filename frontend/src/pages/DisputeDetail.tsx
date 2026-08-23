@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { disputeService, evidenceService } from '../services/mockServices';
+import { disputeService, evidenceService, contradictionService } from '../services/mockServices';
 import ErsGauge, { ConfidenceBar } from '../components/ErsGauge';
 import { StatusBadge } from '../components/StatusBadge';
 import { Alert } from '../components/Alert';
 import { IconCheck } from '../components/Icons';
-import { Dispute, EvidenceDocument } from '../types';
+import { Dispute, EvidenceDocument, Contradiction } from '../types';
 
 const INGESTION_STEPS = ['Extracting text', 'Classifying metadata', 'Extracting factual timeline', 'Validating cross-citations'];
 
@@ -19,18 +19,21 @@ export default function DisputeDetail() {
   const nav = useNavigate();
   const [dispute, setDispute] = useState<Dispute | undefined>();
   const [docs, setDocs] = useState<EvidenceDocument[]>([]);
+  const [contradictions, setContradictions] = useState<Contradiction[]>([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     disputeService.getById(id).then(setDispute);
     evidenceService.listForDispute(id).then(setDocs);
+    contradictionService.listForDispute(id).then(setContradictions);
   }, [id]);
 
   if (!dispute) return <div className="muted">Loading dispute…</div>;
 
   const d = dispute;
-  const ers = d.ersBreakdown ?? { score: d.ers, label: 'Moderate', requiredPresent: 2, requiredTotal: 2, recommendedComplete: 2, recommendedTotal: 3, contradictionsFound: d.contradictions?.length ?? 1 };
-  const hasContradiction = (d.contradictions?.length ?? 0) > 0;
+  // ERS card is intentionally left as designed (score not recomputed in this slice).
+  const ers = d.ersBreakdown ?? { score: d.ers, label: 'Moderate', requiredPresent: 2, requiredTotal: 2, recommendedComplete: 2, recommendedTotal: 3, contradictionsFound: (contradictions.length || d.contradictions?.length) ?? 1 };
+  const hasContradiction = contradictions.length > 0;
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;

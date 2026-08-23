@@ -6,37 +6,32 @@ import { Contradiction } from '../types';
 export default function ContradictionPage() {
   const { id = 'disp_test_8K72' } = useParams();
   const [list, setList] = useState<Contradiction[]>([]);
-  const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
   useEffect(() => { contradictionService.listForDispute(id).then(setList); }, [id]);
-
-  const c = list[0];
 
   return (
     <>
       <div className="actionbar">
         <Link to={`/disputes/${id}`} className="link-blue" style={{ fontWeight: 600 }}>← Back to evidence overview</Link>
+        <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={async () => setList(await contradictionService.refresh(id))}>↻ Re-run detection</button>
       </div>
 
-      {c && (
-        <div className="card card-pad" style={{ maxWidth: 880 }}>
+      {list.map((c) => (
+        <div className="card card-pad" style={{ maxWidth: 880, marginBottom: 16 }} key={c.id}>
           <div className="row between" style={{ marginBottom: 10 }}>
             <div className="row" style={{ gap: 10 }}>
               <span className="ai" style={{ color: '#dc2626' }}>⚠</span>
-              <span className="page-title" style={{ fontSize: 22 }}>Chronological Inconsistency Identified</span>
+              <span className="page-title" style={{ fontSize: 22 }}>Inconsistency Identified</span>
             </div>
-            <span className="badge badge-red">CONFLICT DETECTED</span>
+            <span className={`badge ${c.severity === 'confirmed' ? 'badge-red' : c.severity === 'possible' ? 'badge-orange' : 'badge-grey'}`}>{(c.severity || 'possible').toUpperCase()} · {c.type}</span>
           </div>
           <p className="muted" style={{ fontSize: 14 }}>
-            The AI Analysis module has cross-referenced the submitted documents and identified a timeline conflict between the delivery confirmation receipt and the customer return form.
+            The AI Analysis module cross-referenced the submitted documents and identified a {c.type} conflict.
           </p>
 
           <div className="row" style={{ gap: 16, marginTop: 18, alignItems: 'stretch' }}>
             <div className="card card-pad" style={{ flex: 1, border: '1px solid var(--green-border)' }}>
-              <div className="card-title" style={{ color: 'var(--green-text)' }}>Document A: Delivery Confirmed</div>
-              <div style={{ fontSize: 34, fontWeight: 800, marginTop: 8 }}>March 15</div>
-              <div className="muted">2:43 PM</div>
-              <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>Source Evidence File</div>
-              <div className="link-blue mono" style={{ fontSize: 13 }}>{c.sourceA} • Page 2</div>
+              <div className="card-title" style={{ color: 'var(--green-text)' }}>Document A: {c.sourceA}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, marginTop: 8 }}>{c.claimA}</div>
             </div>
 
             <div style={{ display: 'grid', placeItems: 'center' }}>
@@ -44,11 +39,8 @@ export default function ContradictionPage() {
             </div>
 
             <div className="card card-pad" style={{ flex: 1, border: '1px solid var(--red-border)' }}>
-              <div className="card-title" style={{ color: 'var(--red-text)' }}>Document B: Return Initiated</div>
-              <div style={{ fontSize: 34, fontWeight: 800, marginTop: 8 }}>March 12</div>
-              <div className="muted">10:14 AM</div>
-              <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>Source Evidence File</div>
-              <div className="link-blue mono" style={{ fontSize: 13 }}>{c.sourceB} • Page 1</div>
+              <div className="card-title" style={{ color: 'var(--red-text)' }}>Document B: {c.sourceB}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, marginTop: 8 }}>{c.claimB}</div>
             </div>
           </div>
 
@@ -60,8 +52,11 @@ export default function ContradictionPage() {
           </div>
 
           <div className="row" style={{ marginTop: 20, gap: 12 }}>
-            <button className="btn btn-primary" disabled={reviewed[c.id]} onClick={() => setReviewed((p) => ({ ...p, [c.id]: true }))}>
-              {reviewed[c.id] ? '✓ Marked as Reviewed' : 'Mark Contradiction as Reviewed'}
+            <button className="btn btn-primary" disabled={c.reviewed} onClick={async () => {
+              const updated = await contradictionService.review(c.id);
+              if (updated) setList((prev) => prev.map((x) => (x.id === c.id ? { ...x, reviewed: true } : x)));
+            }}>
+              {c.reviewed ? '✓ Marked as Reviewed' : 'Mark Contradiction as Reviewed'}
             </button>
             <button className="btn btn-ghost">View Source Documents</button>
           </div>
@@ -70,7 +65,7 @@ export default function ContradictionPage() {
             Disclaimer: DisputeIQ highlights potential timeline and logic contradictions based on document extraction. Merchants assume final responsibility for evidence validity prior to Razorpay API submission.
           </div>
         </div>
-      )}
+      ))}
     </>
   );
 }
