@@ -9,6 +9,11 @@ import { Dispute, EvidenceDocument } from '../types';
 
 const INGESTION_STEPS = ['Extracting text', 'Classifying metadata', 'Extracting factual timeline', 'Validating cross-citations'];
 
+function humanizeType(t?: string): string {
+  if (!t) return 'Unclassified';
+  return t.split('_').map((w) => w[0] + w.slice(1).toLowerCase()).join(' ');
+}
+
 export default function DisputeDetail() {
   const { id = 'disp_test_8K72' } = useParams();
   const nav = useNavigate();
@@ -36,6 +41,13 @@ export default function DisputeDetail() {
     setDocs(refreshed);
     setUploading(false);
     if (e.target) e.target.value = '';
+  };
+
+  const onReclassify = async (evId: string) => {
+    const updated = await evidenceService.reclassify(evId);
+    if (updated) {
+      setDocs((prev) => prev.map((doc) => (doc.id === evId ? { ...doc, ...updated } : doc)));
+    }
   };
 
   return (
@@ -98,7 +110,10 @@ export default function DisputeDetail() {
                   <div>
                     <div style={{ fontWeight: 600 }}>{doc.fileName}</div>
                     <div className="row" style={{ marginTop: 4, gap: 8, flexWrap: 'wrap' }}>
-                      <span className="badge badge-grey">{doc.badgeLabel}</span>
+                      <span className="badge badge-blue">{humanizeType(doc.evidenceType) || doc.badgeLabel}</span>
+                      {doc.classificationSource && (
+                        <span className="badge badge-grey" title="Classification engine">{doc.classificationSource}</span>
+                      )}
                       <span className="muted" style={{ fontSize: 12 }}>{doc.size}</span>
                     </div>
                     {doc.contentPreview && doc.contentPreview.length > 0 && (
@@ -116,6 +131,9 @@ export default function DisputeDetail() {
                   <div className="row" style={{ gap: 14 }}>
                     {doc.confidence != null && <ConfidenceBar value={doc.confidence} />}
                     <span className={`badge ${doc.ingestionStatus === 'EXTRACTION_FAILED' ? 'badge-red' : doc.ingestionStatus === 'OCR_REQUIRED' ? 'badge-orange' : doc.ingestionStatus === 'EXTRACTED' ? 'badge-green' : 'badge-grey'}`}>{doc.statusLabel}</span>
+                    {doc.ingestionStatus === 'EXTRACTED' && (
+                      <button className="btn-mini" onClick={() => onReclassify(doc.id)} title="Re-run classification">↻</button>
+                    )}
                   </div>
                 </div>
               </div>

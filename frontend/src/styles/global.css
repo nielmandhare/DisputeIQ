@@ -138,6 +138,8 @@ ul { list-style: none; }
 .badge-grey { background: var(--grey-bg); color: var(--grey-text); }
 .badge-orange { background: var(--orange-bg); color: var(--orange-text); }
 
+.btn-mini { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--row-divider); background: var(--grey-bg); color: var(--text-secondary); font-size: 14px; cursor: pointer; transition: background .12s; }
+.btn-mini:hover { background: var(--blue-soft); color: var(--blue); }
 /* ===== Tables ===== */
 .table-wrap { background: #fff; border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: var(--shadow-card); overflow: hidden; }
 table.grid { width: 100%; border-collapse: collapse; }

@@ -71,6 +71,7 @@ export interface EvidenceDocument {
   evidenceType?: EvidenceType;
   evidenceTypeLabel?: string; // display label e.g. "CUSTOMER COMMUNICATION"
   confidence?: number; // 0-100
+  classificationSource?: 'LLM' | 'HEURISTIC';
   ingestionStatus: IngestionStatus;
   statusLabel?: string; // e.g. "ANALYZED" / "CONTRADICTION" / "PARTIAL EXTRACTION"
   extractionMethod?: 'pdf_text' | 'ocr' | 'neural parser';

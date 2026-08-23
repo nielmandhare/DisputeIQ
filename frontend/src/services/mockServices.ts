@@ -100,6 +100,14 @@ export const evidenceService = {
       statusLabel: 'PROCESSING',
     }));
   },
+  // Slice 3: re-run classification on an existing evidence record (backend).
+  async reclassify(evId: string): Promise<EvidenceDocument | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/evidence/${evId}/reclassify`, { method: 'POST' });
+      if (res.ok) return toUiEvidence(await res.json());
+    } catch { /* ignore */ }
+    return null;
+  },
 };
 
 // Map backend EvidenceDocument -> frontend EvidenceDocument shape.
@@ -108,12 +116,13 @@ function toUiEvidence(e: any): EvidenceDocument {
     id: e.id,
     fileName: e.fileName,
     size: e.size,
-    badgeLabel: e.extractionMethod || e.processingStatus,
+    badgeLabel: e.evidenceType || e.extractionMethod || e.processingStatus,
     ingestionStatus: e.processingStatus,
     statusLabel: e.statusLabel,
     extractionMethod: e.extractionMethod?.toLowerCase().includes('pdf') ? 'pdf_text' : undefined,
-    evidenceType: undefined, // classification is Slice 3
-    confidence: undefined,   // scoring is Slice 3
+    evidenceType: e.evidenceType,                       // Slice 3 classification
+    confidence: e.confidence != null ? Number(e.confidence) : undefined,
+    classificationSource: e.classificationSource,
     contentPreview: e.extractedPreview ? e.extractedPreview.split('\n').slice(0, 3) : undefined,
     reviewed: false,
   };
