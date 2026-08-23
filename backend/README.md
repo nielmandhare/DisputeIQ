@@ -30,6 +30,8 @@ Dev with auto-reload: `npm run dev`
 | POST | `/api/disputes/:id/evidence` | multipart upload (field `files`) → store + extract inline |
 | GET | `/api/disputes/:id/evidence` | list evidence (safe metadata + truncated preview) |
 | GET | `/api/evidence/:id` | evidence detail (includes full `extractedText`) |
+| POST | `/api/evidence/:id/reclassify` | re-run the classification engine on an existing record |
+| GET | `/api/evidence/:id/classification` | classification history + provenance (source spans) |
 
 ## Webhook pipeline (Slice 1)
 ```
@@ -60,6 +62,29 @@ Processing states: `UPLOADED → PROCESSING → EXTRACTED | OCR_REQUIRED | EXTRA
   OCR_REQUIRED (no OCR yet; surfaced honestly, never faked as success).
 - Persisted metadata: `extractionMethod`, `characterCount`, `pageCount`, `processingMs`.
 
+## Classification pipeline (Slice 3)
+Runs on ALREADY-EXTRACTED text (never raw files). Classification is triggered inline
+after extraction (status EXTRACTED) and re-runnable via `POST /api/evidence/:id/reclassify`.
+```
+Extract (Slice 2) -> text
+ -> classify(text) -> evidenceType + confidence (0-100) + sourceSpans (provenance)
+ -> persist on evidence_documents + full record in evidence_classifications
+ -> audit (actor AI ENGINE)
+```
+**Two interchangeable engines** (same output contract):
+- `HEURISTIC` (default / demo): deterministic keyword + regex patterns over a closed
+  evidence-type taxonomy (`INVOICE_OR_RECEIPT`, `SHIPPING_OR_DELIVERY`, `COMMUNICATION`,
+  `REFUND_OR_CANCELLATION`, `IDENTITY_OR_KYC`, `PRODUCT_PHOTO`, `LEGAL_OR_DISPUTE_RESPONSE`,
+  `OTHER`). Emits `sourceSpans` (verbatim matched phrases + char-window snippets) so every
+  label is grounded in the source document. No external dependency.
+- `LLM` (active only when `LLM_API_KEY` is set): structured JSON via an OpenAI-compatible
+  `/chat/completions` endpoint, schema-validated. On any failure (HTTP error, timeout,
+  invalid schema) it **transparently falls back to HEURISTIC** so the pipeline never breaks;
+  the fallback reason is recorded.
+
+Provenance: every classification writes a row to `evidence_classifications` (type, confidence,
+method, model, signals, sourceSpans, sourceText, fallbackReason) — fully auditable.
+
 ## Dev seed (no Razorpay keys needed)
 With `DISPUTEIQ_DEV_SEED=true` (default) and no live keys, `POST /dev/seed-dispute`
 generates a `payment.dispute.created` event, signs it with a dev-only placeholder
@@ -69,19 +94,24 @@ presented as a real Razorpay event.
 
 ## Tests
 ```bash
-bash test.sh        # isolated DB; runs webhook + evidence suites
+bash test.sh        # isolated DB; runs webhook + evidence + classification suites
 ```
 Covers: signature verify (valid/tampered/wrong), webhook accept, duplicate idempotency,
-invalid-signature/malformed/missing-field rejection, dispute normalization; and evidence
+invalid-signature/malformed/missing-field rejection, dispute normalization; evidence
 upload (valid TXT/JSON/PDF, invalid JSON, image-only PDF → OCR_REQUIRED, unsupported type,
-oversized, missing file, nonexistent dispute, path-traversal neutralization).
+oversized, missing file, nonexistent dispute, path-traversal neutralization); and
+classification (heuristic types for each taxonomy entry, source spans present, confidence
+bounds, empty/unrelated-text → OTHER, LLM-failure → HEURISTIC fallback, persist + provenance,
+reclassify, no classification on non-extracted docs).
 
 ## Notes / scope
 - Only documented Razorpay dispute capabilities are used (GET /v1/disputes, webhook
   events `payment.dispute.*`). No evidence submission to Razorpay yet (gated behind human
   approval; Phase 1G).
-- No AI in Slice 2 (classification/contradiction/ERS are later slices).
+- Slice 3 classifies extracted text only — no factual-timeline extraction, contradiction
+  detection, or ERS computation yet (those are later slices).
 - Secrets are never returned to the frontend. The frontend only ever receives safe,
   normalized data. Full `extractedText` is served only via the authorized detail endpoint.
-- Later slices (AI classification, contradiction engine, human approval + submission) build
-  on the `disputes` / `webhook_events` / `audit_events` / `evidence_documents` tables.
+- Later slices (contradiction engine, ERS, human approval + submission) build
+  on the `disputes` / `webhook_events` / `audit_events` / `evidence_documents` /
+  `evidence_classifications` tables.

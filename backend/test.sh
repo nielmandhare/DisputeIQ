@@ -6,4 +6,5 @@ rm -f .test.db .test.db-wal .test.db-shm
 export DATABASE_PATH=./.test.db
 node --test tests/webhook.test.js
 node --test tests/evidence.test.js
+node --test tests/classification.test.js
 rm -f .test.db .test.db-wal .test.db-shm
