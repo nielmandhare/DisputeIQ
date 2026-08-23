@@ -132,6 +132,29 @@ CREATE TABLE IF NOT EXISTS contradictions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_contradiction_dispute ON contradictions(disputeId);
+
+-- Slice 5: grounded factual timeline events.
+CREATE TABLE IF NOT EXISTS factual_events (
+  id                TEXT PRIMARY KEY,             -- fe_...
+  evidenceId        TEXT NOT NULL,                -- FK evidence_documents(id)
+  disputeId         TEXT NOT NULL,
+  eventType         TEXT NOT NULL,                -- one of EVENT_TYPES
+  eventDate         TEXT,                         -- ISO YYYY-MM-DD (null if not determinable)
+  eventTime         TEXT,                         -- HH:MM (null if not present)
+  datePrecision     TEXT NOT NULL DEFAULT 'unknown', -- datetime|date|month|unknown
+  actor             TEXT,                         -- courier|customer|merchant|bank|system|null
+  description       TEXT NOT NULL,               -- verbatim factual clause from source
+  sourceDocument    TEXT NOT NULL,               -- original filename (display)
+  sourceLocation    TEXT,                         -- e.g. "Line 14" / "Lines 14-16" / null (never fabricated)
+  confidence        INTEGER NOT NULL,             -- 0-100
+  extractionVersion TEXT NOT NULL DEFAULT 'timeline-v1',
+  createdAt         INTEGER NOT NULL,
+  FOREIGN KEY (evidenceId) REFERENCES evidence_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (disputeId) REFERENCES disputes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_fact_evidence ON factual_events(evidenceId);
+CREATE INDEX IF NOT EXISTS idx_fact_dispute ON factual_events(disputeId);
 `);
 
 // Slice 3: classification columns on evidence_documents (idempotent adds, so
@@ -145,6 +168,7 @@ addColumnIfMissing('evidence_documents', 'confidence', 'INTEGER');
 addColumnIfMissing('evidence_documents', 'classificationMethod', 'TEXT');
 addColumnIfMissing('evidence_documents', 'classificationSource', 'TEXT');
 addColumnIfMissing('evidence_documents', 'classificationError', 'TEXT');
+addColumnIfMissing('evidence_documents', 'timelineStatus', 'TEXT');
 
 export function now() {
   return Math.floor(Date.now() / 1000);

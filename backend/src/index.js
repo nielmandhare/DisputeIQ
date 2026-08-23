@@ -10,6 +10,7 @@ import { listAuditForDispute, exportAuditCSV, exportAuditJSON } from './services
 import { seedSimulatedDispute } from './dev/seed.js';
 import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification } from './repositories/evidence.js';
 import { listForDispute as listContradictions, detectAndStoreContradictions, markReviewed } from './repositories/contradictions.js';
+import { listForEvidence as listTimeline, listForDispute as listTimelineDispute, runTimelineExtraction } from './repositories/timeline.js';
 
 function safeJson(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
@@ -150,6 +151,28 @@ app.post('/api/contradictions/:id/review', (req, res) => {
   const c = markReviewed(req.params.id, true);
   if (!c) return res.status(404).json({ error: 'not_found' });
   res.json(c);
+});
+
+// Slice 5 — Factual timeline extraction.
+// GET the grounded timeline for a whole dispute (all its evidence documents).
+app.get('/api/disputes/:id/timeline', (req, res) => {
+  res.json(listTimelineDispute(req.params.id));
+});
+// GET the grounded timeline for a single evidence document.
+app.get('/api/evidence/:id/timeline', (req, res) => {
+  res.json(listTimeline(req.params.id));
+});
+// POST (re)extract the timeline for an evidence document. Idempotent replacement.
+app.post('/api/evidence/:id/timeline', (req, res) => {
+  try {
+    const result = runTimelineExtraction(req.params.id);
+    if (result.status === 'SKIPPED') return res.status(409).json({ error: 'extraction_unavailable', message: result.reason });
+    if (result.status === 'FAILED') return res.status(500).json({ error: 'timeline_failed', message: result.reason });
+    res.json(result);
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({ error: status === 404 ? 'not_found' : 'timeline_failed', message: e.message });
+  }
 });
 
 // 404

@@ -6,6 +6,7 @@ import { storage } from '../services/storage.js';
 import { extract, isSupportedMime } from '../services/extraction.js';
 import { classifyEvidence } from '../services/classifier.js';
 import { detectAndStoreContradictions } from '../repositories/contradictions.js';
+import { runTimelineExtraction } from '../repositories/timeline.js';
 import { recordAudit } from '../services/audit.js';
 
 const MAX_SIZE = Number(process.env.EVIDENCE_MAX_BYTES || 15 * 1024 * 1024); // 15 MB
@@ -67,6 +68,8 @@ export async function createEvidence(disputeId, file) {
     await runClassification(id);
     // Slice 4: re-run the contradiction engine now that a new extracted doc exists.
     detectAndStoreContradictions(disputeId);
+    // Slice 5: extract the grounded factual timeline from this document.
+    await runTimelineExtraction(id);
   }
   return getEvidenceById(id);
 }
@@ -145,6 +148,7 @@ function toSafeShape(r) {
     confidence: r.confidence == null ? undefined : Number(r.confidence),
     classificationMethod: r.classificationMethod || undefined,
     classificationSource: r.classificationSource || undefined,
+    timelineStatus: r.timelineStatus || undefined,
     createdAt: new Date(r.createdAt * 1000).toISOString(),
     updatedAt: new Date(r.updatedAt * 1000).toISOString(),
   };
