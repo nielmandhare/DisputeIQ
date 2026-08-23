@@ -12,15 +12,50 @@ import {
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// --- Real backend integration (Slice 1) -------------------------------------
+// The frontend calls the Hermes backend; if it is unreachable or returns
+// nothing, we transparently fall back to mock data so the UI never breaks.
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || 'http://localhost:4000';
+
+async function apiGet<T>(path: string, timeoutMs = 2500): Promise<T | null> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { signal: controller.signal });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null; // network/timeout -> fallback to mock
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // Simulate a contest submission to Razorpay (mock). Returns API-style response.
 export interface SubmitResult { status: number; dispute_id: string; contest_submitted_at: string; evidence_count: number; }
 
 export const disputeService = {
   async list(): Promise<Dispute[]> {
+    const live = await apiGet<Dispute[]>('/api/disputes');
+    if (live && live.length) return live;
     await delay(120);
     return DEMO_DISPUTES;
   },
   async getById(id: string): Promise<Dispute | undefined> {
+    const live = await apiGet<Dispute>(`/api/disputes/${id}`);
+    if (live) {
+      // Backend provides core fields + audit; attach the demo sub-panels
+      // (documents / contradictions / gaps) so the detail page renders fully.
+      const demo = DEMO_DISPUTES.find((d) => d.id === id);
+      return {
+        ...live,
+        documents: demo?.documents ?? [],
+        contradictions: demo?.contradictions ?? [],
+        gaps: demo?.gaps ?? [],
+        ersBreakdown: demo?.ersBreakdown,
+        audit: live.audit ?? demo?.audit ?? [],
+      };
+    }
     await delay(120);
     return DEMO_DISPUTES.find((d) => d.id === id);
   },
