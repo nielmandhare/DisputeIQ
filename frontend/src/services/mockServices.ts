@@ -170,6 +170,8 @@ export const timelineService = {
 
 export const gapService = {
   async listForDispute(id: string): Promise<GapItem[]> {
+    const live = await apiGet<GapItem[]>(`/api/disputes/${id}/gaps`);
+    if (live) return live;
     await delay(100);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     return d?.gaps ?? DEMO_GAPS;
@@ -178,6 +180,8 @@ export const gapService = {
 
 export const ersService = {
   async getForDispute(id: string): Promise<ErsBreakdown> {
+    const live = await apiGet<ErsBreakdown>(`/api/disputes/${id}/ers`);
+    if (live) return live;
     await delay(80);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     return d?.ersBreakdown ?? DEMO_ERS;

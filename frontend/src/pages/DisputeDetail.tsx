@@ -32,7 +32,7 @@ export default function DisputeDetail() {
 
   const d = dispute;
   // ERS card is intentionally left as designed (score not recomputed in this slice).
-  const ers = d.ersBreakdown ?? { score: d.ers, label: 'Moderate', requiredPresent: 2, requiredTotal: 2, recommendedComplete: 2, recommendedTotal: 3, contradictionsFound: (contradictions.length || d.contradictions?.length) ?? 1 };
+  const ers = d.ersBreakdown ?? { score: d.ers, label: d.ers >= 85 ? 'Strong' : d.ers >= 65 ? 'Moderate' : d.ers >= 40 ? 'Weak' : 'Incomplete', requiredPresent: 0, requiredTotal: 0, recommendedComplete: 0, recommendedTotal: 0, contradictionsFound: contradictions.length || d.contradictions?.length || 0 };
   const hasContradiction = contradictions.length > 0;
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -29,7 +29,7 @@ export default function Dossier() {
             <div className="muted" style={{ fontSize: 13 }}>Generated directly from verified merchant evidence records.</div>
             <div className="row" style={{ marginTop: 10, gap: 12 }}>
               <span className="check" style={{ fontWeight: 700 }}>Evidence score {d.ers}/100</span>
-              <span className="badge badge-green">READY FOR SUBMISSION</span>
+              <span className={`badge ${d.ers >= 70 ? 'badge-green' : 'badge-orange'}`}>{d.ers >= 70 ? 'READY FOR SUBMISSION' : 'NEEDS MORE EVIDENCE'}</span>
             </div>
           </div>
           <div className="row" style={{ gap: 12 }}>
@@ -47,7 +47,7 @@ export default function Dossier() {
   "amount": ${d.amount},
   "evidence_documents": [${(d.documents ?? []).map((x) => `"${x.fileName}"`).join(', ')}],
   "contradictions": ${(d.contradictions ?? []).length},
-  "evidence_readiness_score": ${d.ers}
+  "evidence_readiness_score": ${d.ersBreakdown?.score ?? d.ers}
 }`}
         </div>
       )}
