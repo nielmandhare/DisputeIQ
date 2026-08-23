@@ -3,11 +3,16 @@
 import express from 'express';
 import multer from 'multer';
 import { config } from './config.js';
+import { db } from './db.js';
 import { handleWebhook } from './services/razorpay/webhooks.js';
 import { listDisputes, getDisputeById } from './repositories/disputes.js';
 import { listAuditForDispute, exportAuditCSV, exportAuditJSON } from './services/audit.js';
 import { seedSimulatedDispute } from './dev/seed.js';
-import { createEvidence, listForDispute, getEvidenceMeta } from './repositories/evidence.js';
+import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification } from './repositories/evidence.js';
+
+function safeJson(s) {
+  try { return s ? JSON.parse(s) : null; } catch { return null; }
+}
 
 const upload = multer({
   storage: multer.memoryStorage(), // we persist via StorageService, not multer disk
@@ -103,9 +108,29 @@ app.get('/api/disputes/:id/evidence', (req, res) => {
   res.json(listForDispute(req.params.id));
 });
 app.get('/api/evidence/:id', (req, res) => {
-  const ev = getEvidenceMeta(req.params.id);
+  const ev = getEvidenceById(req.params.id); // detail: includes extractedText + classification
   if (!ev) return res.status(404).json({ error: 'not_found' });
   res.json(ev);
+});
+// Re-run the Slice 3 classification engine on an existing evidence record.
+app.post('/api/evidence/:id/reclassify', async (req, res) => {
+  try {
+    const ev = await runClassification(req.params.id);
+    if (!ev) return res.status(404).json({ error: 'not_found' });
+    res.json(ev);
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({ error: status === 404 ? 'not_found' : 'classification_failed', message: e.message });
+  }
+});
+// Classification history / provenance for an evidence record.
+app.get('/api/evidence/:id/classification', (req, res) => {
+  const rows = db.prepare('SELECT * FROM evidence_classifications WHERE evidenceId = ? ORDER BY createdAt DESC').all(req.params.id);
+  res.json(rows.map((r) => ({
+    id: r.id, evidenceType: r.evidenceType, confidence: r.confidence, method: r.method, model: r.model,
+    signals: safeJson(r.signals), sourceSpans: safeJson(r.sourceSpans), sourceText: r.sourceText,
+    fallbackReason: r.fallbackReason || undefined, createdAt: new Date(r.createdAt * 1000).toISOString(),
+  })));
 });
 
 // 404

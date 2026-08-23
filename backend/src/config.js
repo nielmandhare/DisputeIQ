@@ -28,10 +28,18 @@ export const config = {
   },
   databasePath: process.env.DATABASE_PATH || './disputeiq.db',
   storageDir: process.env.STORAGE_DIR || './storage',
-  llmApiKey: process.env.LLM_API_KEY || '',
+  llm: {
+    apiKey: process.env.LLM_API_KEY || '',
+    baseUrl: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
+    model: process.env.LLM_MODEL || 'gpt-4o-mini',
+    timeoutMs: Number(process.env.LLM_TIMEOUT_MS || 15000),
+  },
   devSeed: (process.env.DISPUTEIQ_DEV_SEED || 'true') === 'true',
   // A Razorpay integration is "live" only when BOTH a key id and secret exist.
   get razorpayConfigured() {
     return Boolean(this.razorpay.keyId && this.razorpay.keySecret);
+  },
+  get llmConfigured() {
+    return Boolean(this.llm.apiKey);
   },
 };

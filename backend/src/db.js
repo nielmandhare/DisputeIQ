@@ -81,6 +81,26 @@ CREATE TABLE IF NOT EXISTS evidence_documents (
 
 CREATE INDEX IF NOT EXISTS idx_evidence_dispute ON evidence_documents(disputeId);
 
+CREATE TABLE IF NOT EXISTS evidence_classifications (
+  id                TEXT PRIMARY KEY,             -- evc_...
+  evidenceId        TEXT NOT NULL,                -- FK evidence_documents(id)
+  disputeId         TEXT NOT NULL,
+  evidenceType      TEXT NOT NULL,                -- one of EVIDENCE_TYPES
+  confidence        INTEGER NOT NULL,             -- 0-100
+  method            TEXT NOT NULL,                -- LLM | HEURISTIC
+  model             TEXT,                         -- model id if LLM
+  signals           TEXT,                         -- JSON array
+  sourceSpans       TEXT,                         -- JSON array (provenance: snippet + match + type)
+  sourceText        TEXT,                         -- truncated source text used
+  fallbackReason    TEXT,                         -- set if LLM failed -> heuristic fallback
+  createdAt         INTEGER NOT NULL,
+  FOREIGN KEY (evidenceId) REFERENCES evidence_documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (disputeId) REFERENCES disputes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_class_evidence ON evidence_classifications(evidenceId);
+CREATE INDEX IF NOT EXISTS idx_class_dispute ON evidence_classifications(disputeId);
+
 CREATE TABLE IF NOT EXISTS processing_jobs (
   id          TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,
@@ -90,6 +110,18 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
   updatedAt   INTEGER NOT NULL
 );
 `);
+
+// Slice 3: classification columns on evidence_documents (idempotent adds, so
+// re-running migrations or sharing a DB across tests never throws "duplicate column").
+function addColumnIfMissing(table, col, type) {
+  const exists = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+  if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+}
+addColumnIfMissing('evidence_documents', 'evidenceType', 'TEXT');
+addColumnIfMissing('evidence_documents', 'confidence', 'INTEGER');
+addColumnIfMissing('evidence_documents', 'classificationMethod', 'TEXT');
+addColumnIfMissing('evidence_documents', 'classificationSource', 'TEXT');
+addColumnIfMissing('evidence_documents', 'classificationError', 'TEXT');
 
 export function now() {
   return Math.floor(Date.now() / 1000);

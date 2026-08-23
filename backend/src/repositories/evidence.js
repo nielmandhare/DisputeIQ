@@ -4,6 +4,7 @@ import { db, now } from '../db.js';
 import { randomUUID } from 'node:crypto';
 import { storage } from '../services/storage.js';
 import { extract, isSupportedMime } from '../services/extraction.js';
+import { classifyEvidence } from '../services/classifier.js';
 import { recordAudit } from '../services/audit.js';
 
 const MAX_SIZE = Number(process.env.EVIDENCE_MAX_BYTES || 15 * 1024 * 1024); // 15 MB
@@ -60,6 +61,50 @@ export async function createEvidence(disputeId, file) {
     UNSUPPORTED: 'EVIDENCE_REJECTED',
   }[result.status] || 'EVIDENCE_PROCESSING_STARTED';
   recordAudit({ actor: 'SYSTEM', eventType: evt, entityType: 'EVIDENCE', entityId: id, statusText: `${result.status} (${result.method || 'n/a'})`, metadata: { chars: result.characterCount, pages: result.pageCount } });
+  // Slice 3: classify the extracted (or OCR-queued) text.
+  if (result.status === 'EXTRACTED') {
+    await runClassification(id);
+  }
+  return getEvidenceById(id);
+}
+
+/**
+ * Run the classification engine on an evidence record and persist the result.
+ * Used both inline (after extraction) and via POST /api/evidence/:id/reclassify.
+ * Operates ONLY on extracted text — never on raw files.
+ */
+export async function runClassification(id) {
+  const row = db.prepare('SELECT * FROM evidence_documents WHERE id = ?').get(id);
+  if (!row) {
+    const err = new Error('Evidence not found');
+    err.status = 404;
+    throw err;
+  }
+  if (!row.extractedText) {
+    return getEvidenceById(id); // nothing to classify
+  }
+  const cls = await classifyEvidence({ extractedText: row.extractedText, filename: row.filename });
+  const ts = now();
+  db.prepare(`UPDATE evidence_documents SET evidenceType=?, confidence=?, classificationMethod=?,
+    classificationSource=?, classificationError=?, updatedAt=? WHERE id=?`).run(
+    cls.evidenceType, cls.confidence, cls.method,
+    cls.method === 'LLM' ? 'LLM' : 'HEURISTIC',
+    cls.error || cls.fallbackReason || null, ts, id,
+  );
+  // Persist full structured classification (provenance) in its own table.
+  const cid = `evc_${randomUUID().slice(0, 8)}`;
+  db.prepare(`INSERT INTO evidence_classifications
+    (id, evidenceId, disputeId, evidenceType, confidence, method, model, signals, sourceSpans, sourceText, fallbackReason, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    cid, id, row.disputeId, cls.evidenceType, cls.confidence, cls.method, cls.model || null,
+    JSON.stringify(cls.signals || []), JSON.stringify(cls.sourceSpans || []),
+    cls.sourceText || null, cls.fallbackReason || null, ts,
+  );
+  recordAudit({
+    actor: 'AI ENGINE', eventType: 'EVIDENCE_CLASSIFIED', entityType: 'EVIDENCE', entityId: id,
+    statusText: `${cls.evidenceType} @${cls.confidence}% via ${cls.method}`,
+    metadata: { evidenceType: cls.evidenceType, confidence: cls.confidence, method: cls.method, model: cls.model || null, fallback: Boolean(cls.fallbackReason) },
+  });
   return getEvidenceById(id);
 }
 
@@ -93,6 +138,10 @@ function toSafeShape(r) {
     extractionError: r.extractionError || undefined,
     storageLocation: r.storageLocation, // logical id (disputeId/safeName), never an absolute fs path
     extractedPreview: r.extractedText ? r.extractedText.slice(0, 280) : undefined, // truncated preview only; full text via /api/evidence/:id
+    evidenceType: r.evidenceType || undefined,
+    confidence: r.confidence == null ? undefined : Number(r.confidence),
+    classificationMethod: r.classificationMethod || undefined,
+    classificationSource: r.classificationSource || undefined,
     createdAt: new Date(r.createdAt * 1000).toISOString(),
     updatedAt: new Date(r.updatedAt * 1000).toISOString(),
   };
