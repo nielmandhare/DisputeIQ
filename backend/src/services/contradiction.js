@@ -65,7 +65,7 @@ function extractDateEvents(text) {
 
 // ---- Amount parsing (only paired when the two docs reference the SAME transaction) ----
 const AMOUNT_RE = /(?:rs\.?|inr|₹)\s?(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)/gi;
-const TXN_RE = /(?:order|payment|txn|transaction|razorpay|inv|invoice|id)[\s#:-]*([a-z0-9][a-z0-9\-]{3,})/gi;
+const TXN_RE = /\b(?:order|payment|txn|transaction|razorpay|invoice|id)[\s#:-]+([a-z0-9][a-z0-9\-]{3,})/gi;
 function extractAmounts(text) {
   const amts = [];
   let m;
