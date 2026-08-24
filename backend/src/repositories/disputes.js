@@ -52,6 +52,7 @@ export function rowToDispute(row) {
   return {
     id: row.id,
     razorpayDisputeId: row.razorpayDisputeId,
+    provider: row.provider || 'razorpay', // 'razorpay' (live/ingested) or 'demo' (synthetic eval set)
     reasonLabel: row.reasonLabel,
     reasonCode: row.reasonCode,
     customer: '—', // Razorpay dispute payload does not include customer name; filled by later enrichment

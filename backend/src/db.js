@@ -209,6 +209,10 @@ db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_submission_dispute_draft
 addColumnIfMissing('disputes', 'submissionStatus', 'TEXT');
 addColumnIfMissing('disputes', 'submittedAt', 'INTEGER');
 addColumnIfMissing('disputes', 'responseStatus', 'TEXT');
+// Demo vs Razorpay provider distinction (synthetic evaluation dataset is
+// explicitly labelled 'demo' and is NEVER presented as a real Razorpay dispute).
+addColumnIfMissing('disputes', 'provider', 'TEXT');
+db.exec(`CREATE INDEX IF NOT EXISTS idx_disputes_provider ON disputes(provider);`);
 
 export function now() {
   return Math.floor(Date.now() / 1000);
