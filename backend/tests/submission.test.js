@@ -13,17 +13,19 @@ import { generateForDispute, approveDraft } from '../src/repositories/responseDr
 import { listAuditForDispute } from '../src/services/audit.js';
 import { createEvidence, listForDispute } from '../src/repositories/evidence.js';
 import { razorpay } from '../src/services/razorpay/client.js';
+import { config } from '../src/config.js';
 
-// Hermetic isolation: the developer's real .env may set LIVE + credentials.
-// These tests must be deterministic, so force SIMULATED/submission mode unless a
-// test explicitly opts into LIVE (and stubs fetch). Clear real creds so the
-// running backend's .env cannot leak into the unit suite.
+// Hermetic isolation: the developer's real .env may set LIVE + credentials AND
+// a live LLM key. These tests must be deterministic, so force SIMULATED mode and
+// clear the LLM key (both process.env and the cached config) so draft generation
+// stays heuristic and no external call occurs. LIVE tests re-enable as needed.
 process.env.RAZORPAY_SUBMISSION_MODE = 'simulated';
 delete process.env.RAZORPAY_KEY_ID;
 delete process.env.RAZORPAY_KEY_SECRET;
-// Keep a fake key so llmConfigured-style checks don't matter here.
 process.env.RAZORPAY_KEY_ID = 'rzp_test_x';
 process.env.RAZORPAY_KEY_SECRET = 'secret';
+delete process.env.LLM_API_KEY;
+config.llm.apiKey = '';
 
 function seedDispute(reasonCode = 'non_receipt_of_goods') {
   const id = `disp_test_${randomUUID().slice(0, 8)}`;
@@ -53,7 +55,7 @@ after(() => {
   db.prepare("DELETE FROM submissions WHERE disputeId LIKE 'disp_test_%'").run();
 });
 
-test('cannot submit without an approved draft (security: approval mandatory)', async () => {
+test('cannot submit without an approved draft (security: approval mandatory)', { serial: true }, async () => {
   const id = seedDispute();
   await uploadExtracted(id, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
   await uploadExtracted(id, 'ship.txt', 'Delivered on March 15.', 'SHIPPING_OR_DELIVERY');
@@ -63,7 +65,7 @@ test('cannot submit without an approved draft (security: approval mandatory)', a
   assert.equal(s, null); // nothing persisted
 });
 
-test('cannot submit with missing required evidence (shipping proof)', async () => {
+test('cannot submit with missing required evidence (shipping proof)', { serial: true }, async () => {
   const id = seedDispute();
   await uploadExtracted(id, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
   // No SHIPPING_OR_DELIVERY uploaded -> blocked. Give the invoice a grounded event so the
@@ -74,7 +76,7 @@ test('cannot submit with missing required evidence (shipping proof)', async () =
   await assert.rejects(() => submitDispute(id, { actor: 'HUMAN' }), /required evidence missing/i);
 });
 
-test('SIMULATED submission works and makes NO external Razorpay call', async () => {
+test('SIMULATED submission works and makes NO external Razorpay call', { serial: true }, async () => {
   let externalCall = false;
   const origFetch = globalThis.fetch;
   globalThis.fetch = async () => { externalCall = true; throw new Error('should not be called'); };
@@ -98,7 +100,7 @@ test('SIMULATED submission works and makes NO external Razorpay call', async () 
   }
 });
 
-test('idempotency: double submit returns the existing submission, no duplicate call', async () => {
+test('idempotency: double submit returns the existing submission, no duplicate call', { serial: true }, async () => {
   const id = seedDispute();
   await uploadExtracted(id, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
   await uploadExtracted(id, 'ship.txt', 'Delivered on March 15.', 'SHIPPING_OR_DELIVERY');
@@ -111,7 +113,7 @@ test('idempotency: double submit returns the existing submission, no duplicate c
   assert.equal(rows.c, 1, 'only one submission persisted');
 });
 
-test('unknown result (timeout after request) is marked REQUIRES_REVIEW, never blindly retried', async () => {
+test('unknown result (timeout after request) is marked REQUIRES_REVIEW, never blindly retried', { serial: true }, async () => {
   // Enable LIVE by faking credentials + live mode, then stub fetch to abort (timeout).
   const prevId = process.env.RAZORPAY_KEY_ID, prevSecret = process.env.RAZORPAY_KEY_SECRET, prevMode = process.env.RAZORPAY_SUBMISSION_MODE;
   process.env.RAZORPAY_KEY_ID = 'rzp_test_x'; process.env.RAZORPAY_KEY_SECRET = 'secret'; process.env.RAZORPAY_SUBMISSION_MODE = 'live';
@@ -134,7 +136,7 @@ test('unknown result (timeout after request) is marked REQUIRES_REVIEW, never bl
   }
 });
 
-test('LIVE 4xx failure is surfaced and recorded as SUBMISSION_FAILED (no blind retry)', async () => {
+test('LIVE 4xx failure is surfaced and recorded as SUBMISSION_FAILED (no blind retry)', { serial: true }, async () => {
   const prevId = process.env.RAZORPAY_KEY_ID, prevSecret = process.env.RAZORPAY_KEY_SECRET, prevMode = process.env.RAZORPAY_SUBMISSION_MODE;
   process.env.RAZORPAY_KEY_ID = 'rzp_test_x'; process.env.RAZORPAY_KEY_SECRET = 'secret'; process.env.RAZORPAY_SUBMISSION_MODE = 'live';
   const origFetch = globalThis.fetch;
@@ -159,7 +161,7 @@ test('LIVE 4xx failure is surfaced and recorded as SUBMISSION_FAILED (no blind r
   }
 });
 
-test('precondition verifier blocks stale/invalid drafts', async () => {
+test('precondition verifier blocks stale/invalid drafts', { serial: true }, async () => {
   const id = seedDispute();
   const draft = { status: 'DRAFT_READY', valid: true, metrics: { coverage: 100 } };
   const evidence = [{ evidenceType: 'INVOICE_OR_RECEIPT' }, { evidenceType: 'SHIPPING_OR_DELIVERY' }];
@@ -171,7 +173,7 @@ test('precondition verifier blocks stale/invalid drafts', async () => {
   assert.equal(r3.ok, false, 'missing evidence must be blocked');
 });
 
-test('cross-dispute submission cannot be forced via idempotency lookup', async () => {
+test('cross-dispute submission cannot be forced via idempotency lookup', { serial: true }, async () => {
   const a = seedDispute(), b = seedDispute();
   await uploadExtracted(a, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
   await uploadExtracted(a, 'ship.txt', 'Delivered on March 15.', 'SHIPPING_OR_DELIVERY');

@@ -6,6 +6,14 @@ import { extractFactualEvents, EVENT_TYPES } from '../src/services/timeline.js';
 import { createEvidence } from '../src/repositories/evidence.js';
 import { runTimelineExtraction, listForEvidence, listForDispute } from '../src/repositories/timeline.js';
 import { randomUUID } from 'node:crypto';
+import { config } from '../src/config.js';
+
+// Hermetic isolation: the developer's real .env may configure a live LLM key.
+// These tests assert the deterministic HEURISTIC extraction contract, so force
+// heuristic mode (clear the key in both process.env and the cached config) to
+// keep the suite independent of the live LLM.
+delete process.env.LLM_API_KEY;
+config.llm.apiKey = '';
 
 after(() => {
   try { db.prepare("DELETE FROM factual_events WHERE disputeId LIKE 'disp_test_%'").run(); } catch {}

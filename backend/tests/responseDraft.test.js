@@ -2,6 +2,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { db } from '../src/db.js';
+import { config } from '../src/config.js';
 import { randomUUID } from 'node:crypto';
 import { createEvidence } from '../src/repositories/evidence.js';
 import {
@@ -18,6 +19,11 @@ import {
 } from '../src/services/responseDraft.js';
 import { upsertDisputeFromRazorpay } from '../src/repositories/disputes.js';
 import { detectAndStoreContradictions } from '../src/repositories/contradictions.js';
+
+// Hermetic isolation: clear any live LLM key so draft generation stays HEURISTIC
+// (the deterministic contract these tests assert). Real .env keys must not leak in.
+delete process.env.LLM_API_KEY;
+config.llm.apiKey = '';
 
 function seedDispute(reasonCode = 'non_receipt_of_goods') {
   const id = `disp_${randomUUID().slice(0, 8)}`;

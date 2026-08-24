@@ -25,11 +25,14 @@ import { computeAndStoreErs, getGaps } from '../src/repositories/ers.js';
 import { generateForDispute, approveDraft, getLatest } from '../src/repositories/responseDraft.js';
 import { submitDispute, getSubmission } from '../src/services/submission.js';
 
-// Hermetic: real .env may be live; force SIMULATED + fake creds.
+// Hermetic: real .env may be live; force SIMULATED + fake creds + heuristic LLM.
+import { config } from '../src/config.js';
 process.env.RAZORPAY_SUBMISSION_MODE = 'simulated';
 process.env.RAZORPAY_KEY_ID = 'rzp_test_x';
 process.env.RAZORPAY_KEY_SECRET = 'secret';
 process.env.RAZORPAY_WEBHOOK_SECRET = 'test_webhook_secret';
+delete process.env.LLM_API_KEY;
+config.llm.apiKey = '';
 
 // ---------- helpers ----------
 function seedDispute(prefix = 'disp_cov') {
