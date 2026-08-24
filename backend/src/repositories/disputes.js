@@ -51,6 +51,7 @@ export function rowToDispute(row) {
   const uiStatus = mapStatus(row.status);
   return {
     id: row.id,
+    razorpayDisputeId: row.razorpayDisputeId,
     reasonLabel: row.reasonLabel,
     reasonCode: row.reasonCode,
     customer: '—', // Razorpay dispute payload does not include customer name; filled by later enrichment
