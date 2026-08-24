@@ -13,6 +13,7 @@
 // Output contract: { evidenceType, confidence (0-100), signals[], sourceSpans[],
 //                    method, model?, sourceText? }
 import { config } from '../config.js';
+import { callLLM as callLLMShared } from './llm.js';
 
 // ---- Taxonomy (closed set; keep in sync with frontend if surfaced) ----
 export const EVIDENCE_TYPES = [
@@ -102,35 +103,8 @@ Return ONLY strict JSON in this shape (no prose, no markdown):
 }`;
 
 async function callLLM(text) {
-  const apiKey = config.llm.apiKey;
-  const baseUrl = config.llm.baseUrl || 'https://api.openai.com/v1';
-  const model = config.llm.model || 'gpt-4o-mini';
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), config.llm.timeoutMs || 15000);
-  try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: CLASSIFICATION_PROMPT },
-          { role: 'user', content: `DOCUMENT TEXT:\n"""\n${text.slice(0, 12000)}\n"""` },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error(`LLM HTTP ${res.status}`);
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) throw new Error('LLM empty content');
-    const parsed = JSON.parse(content);
-    return { raw: parsed, model };
-  } finally {
-    clearTimeout(t);
-  }
+  const { raw, model } = await callLLMShared(CLASSIFICATION_PROMPT, `DOCUMENT TEXT:\n"""\n${text.slice(0, 12000)}\n"""`, { responseFormatJson: true });
+  return { raw, model };
 }
 
 function normalizeLLM(raw, model) {

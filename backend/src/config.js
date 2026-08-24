@@ -30,8 +30,8 @@ export const config = {
   storageDir: process.env.STORAGE_DIR || './storage',
   llm: {
     apiKey: process.env.LLM_API_KEY || '',
-    baseUrl: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
-    model: process.env.LLM_MODEL || 'gpt-4o-mini',
+    baseUrl: process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1',
+    model: process.env.LLM_MODEL || 'openai/gpt-4o-mini',
     timeoutMs: Number(process.env.LLM_TIMEOUT_MS || 15000),
   },
   devSeed: (process.env.DISPUTEIQ_DEV_SEED || 'true') === 'true',

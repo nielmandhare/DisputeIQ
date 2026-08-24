@@ -12,6 +12,7 @@
 // Every event MUST be grounded in the source; unsupported/fabricated events are rejected,
 // never silently persisted.
 import { config } from '../config.js';
+import { callLLM as callLLMShared } from './llm.js';
 import { parseDate, parseTime, DATE_RE, TIME_RE } from './dateUtils.js';
 
 export const EVENT_TYPES = [
@@ -148,34 +149,8 @@ Return ONLY strict JSON: { "events": [ { "eventType": "...", "date": "YYYY-MM-DD
 Do NOT infer intent. Do NOT make legal conclusions. Do NOT fabricate dates, actors, or page numbers.`;
 
 async function callLLM(text) {
-  const apiKey = config.llm.apiKey;
-  const baseUrl = config.llm.baseUrl || 'https://api.openai.com/v1';
-  const model = config.llm.model || 'gpt-4o-mini';
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), config.llm.timeoutMs || 15000);
-  try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: TIMELINE_PROMPT },
-          { role: 'user', content: `DOCUMENT TEXT:\n\"\"\"\n${text.slice(0, 12000)}\n\"\"\"` },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error(`LLM HTTP ${res.status}`);
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) throw new Error('LLM empty content');
-    return { raw: JSON.parse(content), model };
-  } finally {
-    clearTimeout(t);
-  }
+  const { raw, model } = await callLLMShared(TIMELINE_PROMPT, `DOCUMENT TEXT:\n"""\n${text.slice(0, 12000)}\n"""`, { responseFormatJson: true });
+  return { raw, model };
 }
 
 function normalizeLLM(raw, model, { filename, mimeType }) {
