@@ -14,4 +14,5 @@ node --test tests/responseDraft.test.js
 node --test tests/submission.test.js
 node --test tests/finalSuite.test.js
 node --test tests/coverage.test.js
+node --test tests/evaluation.test.js
 rm -f .test.db .test.db-wal .test.db-shm

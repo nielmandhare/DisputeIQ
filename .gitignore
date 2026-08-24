@@ -24,3 +24,9 @@ backend/test3.db
 backend/test4.db
 backend/test5.db
 backend/test_run.db
+
+# Runtime logs
+*.log
+backend.log
+frontend.log
+omniroute.log
