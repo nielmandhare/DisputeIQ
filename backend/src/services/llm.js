@@ -50,7 +50,7 @@ function authHeaders(apiKey) {
   // OpenAI-compatible endpoints and simply ignored if unsupported.
   if ((config.llm.baseUrl || '').includes('openrouter.ai')) {
     h['HTTP-Referer'] = process.env.LLM_REFERER || 'https://disputeiq.local';
-    h['X-Title'] = process.env.LLM_TITLE || 'DisputeIQ';
+    h['X-OpenRouter-Title'] = process.env.LLM_TITLE || 'DisputeIQ';
   }
   return h;
 }
@@ -70,6 +70,7 @@ export async function testLlmRequest() {
         model: config.llm.model || 'openai/gpt-4o-mini',
         temperature: 0,
         max_tokens: 16,
+        stream: false,
         messages: [{ role: 'user', content: 'Reply with the single word: OK' }],
       }),
     });
@@ -101,6 +102,7 @@ export async function callLLM(systemInstruction, userContent, opts = {}) {
     const body = {
       model,
       temperature: opts.temperature ?? 0,
+      stream: false,
       messages: [
         { role: 'system', content: systemInstruction },
         { role: 'user', content: userContent.slice(0, 16000) },
@@ -118,7 +120,14 @@ export async function callLLM(systemInstruction, userContent, opts = {}) {
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('LLM empty content');
-    const parsed = JSON.parse(content);
+    // Models (esp. via gateways) often wrap JSON in a ```json fence; tolerate it.
+    const cleaned = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      throw new Error('LLM response was not valid JSON: ' + content.slice(0, 80));
+    }
     return { raw: parsed, model };
   } finally {
     clearTimeout(t);
