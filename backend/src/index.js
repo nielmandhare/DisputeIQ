@@ -14,6 +14,8 @@ import { listForEvidence as listTimeline, listForDispute as listTimelineDispute,
 import { computeAndStoreErs, getErs, getGaps } from './repositories/ers.js';
 import { generateForDispute, getLatest, approveDraft } from './repositories/responseDraft.js';
 import { submitDispute, getSubmission } from './services/submission.js';
+import { DemoDisputeProvider } from './providers/demoProvider.js';
+import { evaluatePopulation, buildEvaluationReport } from './services/evaluation.js';
 
 function safeJson(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
@@ -240,6 +242,60 @@ app.get('/api/disputes/:id/submission', (req, res) => {
   const s = getSubmission(req.params.id);
   if (!s) return res.status(404).json({ error: 'no_submission' });
   res.json(s);
+});
+
+// ---- Demo (synthetic evaluation dataset) ----
+// STRICTLY a controlled evaluation data source. Demo disputes are stamped
+// provider:'demo' and ids use dupu_demo_### — never confused with real Razorpay.
+app.post('/api/demo/seed', (req, res) => {
+  try {
+    const count = Math.min(Number(req.body?.count) || 100, 500);
+    const result = DemoDisputeProvider.loadDemoDataset(count, { regenerateDrafts: true });
+    res.status(201).json({ ...result, note: 'Synthetic evaluation dataset loaded. Not real Razorpay disputes.' });
+  } catch (e) {
+    res.status(500).json({ error: 'demo_seed_failed', message: e.message });
+  }
+});
+
+app.delete('/api/demo/seed', (_req, res) => {
+  try {
+    const cleared = DemoDisputeProvider.clearDemoDataset();
+    res.json({ cleared });
+  } catch (e) {
+    res.status(500).json({ error: 'demo_clear_failed', message: e.message });
+  }
+});
+
+app.get('/api/demo/dataset', (_req, res) => {
+  // Returns the raw 100-descriptor dataset (transparency; no secrets).
+  try {
+    const ds = DemoDisputeProvider.generateSyntheticDisputes(100);
+    res.json({ synthetic: true, count: ds.length, disputes: ds.map((d) => ({
+      id: d.id, provider: d.provider, scenarioKey: d.scenarioKey, scenarioLabel: d.scenarioLabel,
+      merchant: d.merchant, customer: d.customer, reasonCode: d.reasonCode, amountInr: d.amountInr,
+      evidenceTypes: d.evidence.map((e) => e.type), groundTruth: d.groundTruth,
+    })) });
+  } catch (e) {
+    res.status(500).json({ error: 'dataset_failed', message: e.message });
+  }
+});
+
+app.get('/api/evaluation', (_req, res) => {
+  try {
+    const result = evaluatePopulation();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: 'evaluation_failed', message: e.message });
+  }
+});
+
+app.get('/api/evaluation/report', (_req, res) => {
+  try {
+    const result = evaluatePopulation();
+    res.type('text/markdown').send(buildEvaluationReport(result));
+  } catch (e) {
+    res.status(500).json({ error: 'report_failed', message: e.message });
+  }
 });
 
 // 404
