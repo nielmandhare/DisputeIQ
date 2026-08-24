@@ -14,6 +14,17 @@ import { listAuditForDispute } from '../src/services/audit.js';
 import { createEvidence, listForDispute } from '../src/repositories/evidence.js';
 import { razorpay } from '../src/services/razorpay/client.js';
 
+// Hermetic isolation: the developer's real .env may set LIVE + credentials.
+// These tests must be deterministic, so force SIMULATED/submission mode unless a
+// test explicitly opts into LIVE (and stubs fetch). Clear real creds so the
+// running backend's .env cannot leak into the unit suite.
+process.env.RAZORPAY_SUBMISSION_MODE = 'simulated';
+delete process.env.RAZORPAY_KEY_ID;
+delete process.env.RAZORPAY_KEY_SECRET;
+// Keep a fake key so llmConfigured-style checks don't matter here.
+process.env.RAZORPAY_KEY_ID = 'rzp_test_x';
+process.env.RAZORPAY_KEY_SECRET = 'secret';
+
 function seedDispute(reasonCode = 'non_receipt_of_goods') {
   const id = `disp_test_${randomUUID().slice(0, 8)}`;
   db.prepare(`INSERT INTO disputes (id, razorpayDisputeId, razorpayPaymentId, amount, currency, reasonCode, reasonLabel, phase, status, createdAt, updatedAt)
