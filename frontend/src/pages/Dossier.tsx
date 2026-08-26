@@ -29,11 +29,19 @@ export default function Dossier() {
 
   const generate = async () => {
     setGenerating(true);
-    try { setDraft(await responseDraftService.generate(id)); } finally { setGenerating(false); }
+    try {
+      const nd = await responseDraftService.generate(id);
+      setDraft(nd);
+      setD(await disputeService.getById(id));
+    } finally { setGenerating(false); }
   };
   const approve = async () => {
     setApproving(true);
-    try { setDraft(await responseDraftService.approve(id)); } finally { setApproving(false); }
+    try {
+      const nd = await responseDraftService.approve(id);
+      setDraft(nd);
+      setD(await disputeService.getById(id));
+    } finally { setApproving(false); }
   };
 
   if (!d) return <div className="muted">Loading…</div>;
