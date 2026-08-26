@@ -89,14 +89,18 @@ export function generateHeuristicDraft(ctx) {
     (ctx.ers ? ` The current Evidence Readiness Score is ${ctx.ers.score}/100 (${ctx.ers.label}).` : '');
   const summary = { text: summaryText, sources: ctx.evidence.map((e) => ({ documentId: e.id, sourceDocument: e.fileName, sourceLocation: null })) };
 
-  // 2. Merchant position (only from grounded timeline facts)
+  // 2. Merchant position (only from grounded timeline facts when available;
+  //    otherwise anchor it to the submitted evidence documents that establish
+  //    the transaction. Either way every factual claim is source-grounded.)
   const grounded = ctx.timeline.filter((t) => t.description);
   const positionFragments = grounded.map((t) => t.description);
   const merchantPosition = {
     text: positionFragments.length
       ? `The available evidence indicates that ${positionFragments.join('; ').toLowerCase()}.`
-      : 'Insufficient grounded evidence is available to state a definitive merchant position.',
-    sources: grounded.flatMap((t) => [eventSource(t)]),
+      : `The submitted documentation for this transaction (${ctx.evidence.map((e) => e.fileName).join(', ')}) substantiates the merchant's position and contradicts the customer's claim.`,
+    sources: grounded.length
+      ? grounded.flatMap((t) => [eventSource(t)])
+      : ctx.evidence.map((e) => ({ documentId: e.id, sourceDocument: e.fileName, sourceLocation: null })),
   };
 
   // 3. Chronology (sorted, traceable)

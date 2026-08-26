@@ -32,7 +32,6 @@ import Activity from './pages/Activity';
 
 import Settings from './pages/Settings';
 import HelpDocs from './pages/HelpDocs';
-import Placeholder from './pages/Placeholder';
 
 export default function App() {
   return (

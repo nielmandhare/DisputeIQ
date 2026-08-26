@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { disputeService } from '../services/mockServices';
 import { demoService, DemoLoadResult } from '../services/mockServices';
 import { ErsBar, StatusBadge } from '../components/StatusBadge';
-import { IconSearch, IconFilter, IconSort, IconInbox } from '../components/Icons';
+import { IconSearch, IconFilter, IconInbox } from '../components/Icons';
 import { Dispute } from '../types';
 
 type TabKey = 'All' | 'Needs Review' | 'Processing' | 'Submitted' | 'Resolved';

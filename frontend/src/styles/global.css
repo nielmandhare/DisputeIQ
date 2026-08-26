@@ -249,3 +249,14 @@ select.btn { -webkit-appearance: none; appearance: none; padding-right: 30px; ba
 .check { color: var(--green); font-weight: 700; }
 .warn { color: var(--orange); }
 .consistency { color: var(--red); font-weight: 700; }
+
+/* CP7 — grounding validation panel + workflow stepper */
+.grounding-panel { background: var(--card-soft); border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px; }
+.gp-cell { min-width: 92px; text-align: center; }
+.gp-num { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.gp-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.wf-step { transition: background 0.15s ease; }
+.wf-done { border-color: var(--green) !important; }
+.wf-current { border-color: var(--blue) !important; box-shadow: 0 0 0 2px var(--blue-soft); }
+.wf-blocked { border-color: var(--red) !important; }
+.wf-pending { opacity: 0.7; }

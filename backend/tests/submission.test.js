@@ -65,11 +65,12 @@ test('cannot submit without an approved draft (security: approval mandatory)', {
   assert.equal(s, null); // nothing persisted
 });
 
-test('cannot submit with missing required evidence (shipping proof)', { serial: true }, async () => {
+test('cannot submit with missing required evidence (invoice/receipt proof)', { serial: true }, async () => {
   const id = seedDispute();
-  await uploadExtracted(id, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
-  // No SHIPPING_OR_DELIVERY uploaded -> blocked. Give the invoice a grounded event so the
-  // draft is valid; this isolates the missing-evidence precondition.
+  // Shipping proof present but NO invoice/receipt -> still blocked (invoice is the
+  // irreducible proof of the charge). Give a grounded event so the draft is valid,
+  // isolating the missing-evidence precondition.
+  await uploadExtracted(id, 'ship.txt', 'Delivered on March 15.', 'SHIPPING_OR_DELIVERY');
   await uploadExtracted(id, 'com.txt', 'Customer acknowledged receipt on March 16.', 'COMMUNICATION');
   await generateForDispute(id);
   approveDraft(id);
@@ -169,8 +170,12 @@ test('precondition verifier blocks stale/invalid drafts', { serial: true }, asyn
   assert.equal(r1.ok, false, 'unapproved draft must be blocked');
   const r2 = verifySubmissionPreconditions({ id }, { ...draft, status: 'DRAFT_APPROVED', valid: false }, evidence);
   assert.equal(r2.ok, false, 'invalid draft must be blocked');
+  // Invoice/receipt present (the only required type) + approved + valid + 100% grounded -> OK.
   const r3 = verifySubmissionPreconditions({ id }, { ...draft, status: 'DRAFT_APPROVED' }, [{ evidenceType: 'INVOICE_OR_RECEIPT' }]);
-  assert.equal(r3.ok, false, 'missing evidence must be blocked');
+  assert.equal(r3.ok, true, 'approved+valid+grounded draft with invoice/receipt must pass');
+  // But missing the invoice/receipt -> blocked.
+  const r4 = verifySubmissionPreconditions({ id }, { ...draft, status: 'DRAFT_APPROVED' }, [{ evidenceType: 'SHIPPING_OR_DELIVERY' }]);
+  assert.equal(r4.ok, false, 'missing invoice/receipt must be blocked');
 });
 
 test('cross-dispute submission cannot be forced via idempotency lookup', { serial: true }, async () => {

@@ -22,16 +22,30 @@ import { listForDispute as listEvidence } from '../repositories/evidence.js';
 import { computeAndStoreErs, getErs } from '../repositories/ers.js';
 import { getDisputeById } from '../repositories/disputes.js';
 
-const REQUIRED_EVIDENCE_TYPES = ['INVOICE_OR_RECEIPT', 'SHIPPING_OR_DELIVERY'];
+// Mandatory proof that the charge is legitimate. An invoice/receipt is the
+// irreducible evidence for any contest; shipping/photo/communication are
+// supporting but scenario-dependent (not every dispute has a delivery).
+const REQUIRED_EVIDENCE_TYPES = ['INVOICE_OR_RECEIPT'];
 const SUCCESS_STATUSES = ['SUBMITTED', 'CONFIRMED'];
 
-function submissionMode() {
+function liveSubmissionConfigured() {
   // Read credentials LIVE from process.env (not the frozen config object) so the
   // mode can be toggled via environment without restarting the module graph.
   const configured = Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
-  return configured && (process.env.RAZORPAY_SUBMISSION_MODE || 'simulated').toLowerCase() === 'live'
-    ? 'LIVE'
-    : 'SIMULATED';
+  return configured && (process.env.RAZORPAY_SUBMISSION_MODE || 'simulated').toLowerCase() === 'live';
+}
+
+/**
+ * Decide the submission mode. Synthetic/demo disputes (provider='demo') have no
+ * real Razorpay presence, so they can NEVER be submitted to live Razorpay — they
+ * are always SIMULATED (clearly marked, no external request). Only a dispute that
+ * is a real Razorpay dispute (provider != 'demo' AND a real razorpayDisputeId)
+ * AND has live credentials + the explicit flag goes LIVE.
+ */
+function resolveSubmissionMode(dispute) {
+  const isRealRazorpayDispute = dispute?.provider !== 'demo' && Boolean(dispute?.razorpayDisputeId);
+  if (!isRealRazorpayDispute) return 'SIMULATED';
+  return liveSubmissionConfigured() ? 'LIVE' : 'SIMULATED';
 }
 
 function audit(e) {
@@ -187,7 +201,7 @@ export async function submitDispute(disputeId, { actor = 'HUMAN' } = {}) {
     throw err;
   }
 
-  const mode = submissionMode();
+  const mode = resolveSubmissionMode(dispute);
   const startedAt = now();
   const recId = `sub_${requestId}`;
   const base = { id: recId, disputeId, draftId: draft.id, draftVersion: draft.draftVersion, mode, status: 'SUBMISSION_PENDING', requestId, startedAt };

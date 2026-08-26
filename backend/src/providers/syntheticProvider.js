@@ -136,18 +136,23 @@ export function loadDemoDataset(count = 100, { regenerateDrafts = true, seed = 2
 }
 
 /** Clear all demo disputes (and their cascaded evidence/contradictions/etc),
- *  plus the audit + AI-analysis events that reference them, so a reseed starts clean. */
+ *  plus the audit + AI-analysis events + submissions that reference them, so a
+ *  reseed starts clean. Children are deleted BEFORE the disputes themselves so
+ *  the id-based cleanups still find their parent rows. */
 export function clearDemoDataset() {
   const rows = db.prepare("SELECT id FROM disputes WHERE provider='demo'").all();
-  for (const r of rows) {
-    db.prepare('DELETE FROM disputes WHERE id=?').run(r.id);
-  }
-  // Audit events reference disputes via entityId (not a FK) — clean them explicitly.
-  db.prepare("DELETE FROM audit_events WHERE entityType='DISPUTE' AND entityId IN (SELECT id FROM disputes WHERE provider='demo')").run();
-  db.prepare("DELETE FROM audit_events WHERE entityType='EVIDENCE' AND entityId IN (SELECT id FROM evidence_documents WHERE disputeId IN (SELECT id FROM disputes WHERE provider='demo'))").run();
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return 0;
+  const placeholders = ids.map(() => '?').join(',');
+  // Children FIRST (disputes still exist, so FK-less references resolve).
+  db.prepare(`DELETE FROM audit_events WHERE entityType='DISPUTE' AND entityId IN (${placeholders})`).run(...ids);
+  db.prepare(`DELETE FROM ai_analysis_events WHERE disputeId IN (${placeholders})`).run(...ids);
+  db.prepare(`DELETE FROM submissions WHERE disputeId IN (${placeholders})`).run(...ids);
+  db.prepare(`DELETE FROM audit_events WHERE entityType='EVIDENCE' AND entityId IN (SELECT id FROM evidence_documents WHERE disputeId IN (${placeholders}))`).run(...ids);
   db.prepare("DELETE FROM audit_events WHERE entityType='WEBHOOK_EVENT'").run();
-  db.prepare("DELETE FROM ai_analysis_events WHERE disputeId IN (SELECT id FROM disputes WHERE provider='demo')").run();
-  return rows.length;
+  // Now the disputes (cascades evidence/contradictions/timeline/etc).
+  db.prepare(`DELETE FROM disputes WHERE id IN (${placeholders})`).run(...ids);
+  return ids.length;
 }
 
 export const SyntheticDisputeProvider = { loadDemoDataset, clearDemoDataset, generateSyntheticDisputes };

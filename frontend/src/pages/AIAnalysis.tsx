@@ -28,7 +28,7 @@ export default function AIAnalysis() {
     try {
       const [p, e] = await Promise.all([aiService.provider(), aiService.events(300)]);
       setProvider(p);
-      setEvents(e);
+      setEvents(e ?? []);
     } catch (err) {
       setError((err as Error).message || 'Failed to load AI telemetry');
     } finally {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { evidenceService, EvidenceDocument } from '../services/mockServices';
-import { demoService } from '../services/mockServices';
+import { evidenceService, demoService } from '../services/mockServices';
+import { EvidenceDocument } from '../types';
 
 type Stats = {
   total: number; extracted: number; ocrRequired: number; failed: number;

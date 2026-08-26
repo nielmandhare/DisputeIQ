@@ -80,6 +80,7 @@ export interface TimelineEvent {
 
 export interface EvidenceDocument {
   id: string;
+  disputeId?: string;
   fileName: string;
   size: string; // e.g. "24 KB"
   badgeLabel: string; // e.g. "CHAT LOG"
@@ -90,6 +91,8 @@ export interface EvidenceDocument {
   ingestionStatus: IngestionStatus;
   statusLabel?: string; // e.g. "ANALYZED" / "CONTRADICTION" / "PARTIAL EXTRACTION"
   extractionMethod?: 'pdf_text' | 'ocr' | 'neural parser';
+  mimeType?: string;
+  updatedAt?: string;
   facts?: ExtractedFact[];
   contentPreview?: string[];
   reviewed?: boolean;
@@ -138,6 +141,8 @@ export interface AuditEvent {
   eventType: string;
   actor: 'RAZORPAY API' | 'SYSTEM' | 'MERCHANT' | 'AI ENGINE';
   statusText: string;
+  entityType?: string;
+  entityId?: string;
   badge: 'blue' | 'grey' | 'green' | 'orange' | 'red';
   metadata?: Record<string, unknown>;
 }
@@ -205,6 +210,7 @@ export interface ResponseDraft {
   provider: string | null;
   model: string | null;
   status: 'DRAFT_READY' | 'DRAFT_REVIEW_REQUIRED' | 'DRAFT_APPROVED' | 'DRAFT_FAILED';
+  valid?: boolean; // grounding validation result (independent of approval status)
   draft: {
     summary: DraftSection;
     merchantPosition: DraftSection;

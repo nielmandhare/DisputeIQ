@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { auditService, AuditEvent } from '../services/mockServices';
+import { auditService } from '../services/mockServices';
+import { AuditEvent } from '../types';
 import { Link } from 'react-router-dom';
 
 const ACTORS = ['RAZORPAY API', 'SYSTEM', 'MERCHANT', 'AI ENGINE'];
