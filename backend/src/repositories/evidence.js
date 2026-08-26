@@ -122,6 +122,36 @@ export function listForDispute(disputeId) {
   return rows.map(toSafeShape);
 }
 
+// Cross-dispute evidence listing (Checkpoint 4 — Evidence Intelligence page).
+export function listAll(limit = 500) {
+  const rows = db.prepare('SELECT * FROM evidence_documents ORDER BY updatedAt DESC LIMIT ?').all(limit);
+  return rows.map(toSafeShape);
+}
+
+// Aggregate evidence metrics for the overview panel.
+export function evidenceStats() {
+  const rows = db.prepare(`SELECT
+      COUNT(*) total,
+      SUM(CASE WHEN processingStatus='EXTRACTED' THEN 1 ELSE 0 END) extracted,
+      SUM(CASE WHEN processingStatus='OCR_REQUIRED' THEN 1 ELSE 0 END) ocrRequired,
+      SUM(CASE WHEN processingStatus='EXTRACTION_FAILED' THEN 1 ELSE 0 END) failed,
+      SUM(CASE WHEN evidenceType IS NOT NULL AND evidenceType <> '' THEN 1 ELSE 0 END) classified,
+      SUM(CASE WHEN classificationMethod='LLM' THEN 1 ELSE 0 END) llmClassified,
+      SUM(CASE WHEN classificationMethod='HEURISTIC' THEN 1 ELSE 0 END) heuristicClassified
+    FROM evidence_documents`).get();
+  const contradictions = db.prepare('SELECT COUNT(*) c FROM contradictions').get().c;
+  return {
+    total: rows.total || 0,
+    extracted: rows.extracted || 0,
+    ocrRequired: rows.ocrRequired || 0,
+    failed: rows.failed || 0,
+    classified: rows.classified || 0,
+    llmClassified: rows.llmClassified || 0,
+    heuristicClassified: rows.heuristicClassified || 0,
+    contradictions,
+  };
+}
+
 export function getEvidenceById(id) {
   const row = db.prepare('SELECT * FROM evidence_documents WHERE id = ?').get(id);
   return row ? toDetailShape(row) : null;

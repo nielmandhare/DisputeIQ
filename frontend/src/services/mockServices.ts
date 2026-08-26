@@ -153,12 +153,25 @@ export const evidenceService = {
     } catch { /* ignore */ }
     return null;
   },
+  // Checkpoint 4 — cross-dispute evidence intelligence.
+  async listAll(limit = 500): Promise<EvidenceDocument[]> {
+    const live = await apiGet<EvidenceDocument[]>(`/api/evidence?limit=${limit}`);
+    if (live) return live.map(toUiEvidence);
+    return [];
+  },
+  async stats(): Promise<{
+    total: number; extracted: number; ocrRequired: number; failed: number;
+    classified: number; llmClassified: number; heuristicClassified: number; contradictions: number;
+  } | null> {
+    return apiGet('/api/evidence/stats');
+  },
 };
 
 // Map backend EvidenceDocument -> frontend EvidenceDocument shape.
 function toUiEvidence(e: any): EvidenceDocument {
   return {
     id: e.id,
+    disputeId: e.disputeId,
     fileName: e.fileName,
     size: e.size,
     badgeLabel: e.evidenceType || e.extractionMethod || e.processingStatus,
@@ -170,6 +183,8 @@ function toUiEvidence(e: any): EvidenceDocument {
     classificationSource: e.classificationSource,
     contentPreview: e.extractedPreview ? e.extractedPreview.split('\n').slice(0, 3) : undefined,
     reviewed: false,
+    mimeType: e.mimeType,
+    updatedAt: e.updatedAt,
   };
 }
 

@@ -236,6 +236,14 @@ select.btn { -webkit-appearance: none; appearance: none; padding-right: 30px; ba
 .kv:last-child { border-bottom: none; }
 .kv .k { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); }
 .kv .v { font-size: 14px; color: var(--text-primary); font-weight: 500; }
+
+/* ===== Evidence Intelligence (Checkpoint 4) ===== */
+.stat-mini { padding: 14px 16px; }
+.stat-mini .stat-num { font-size: 30px; margin: 4px 0 0; }
+.code-light { border-radius: 8px; padding: 14px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; background: #f8fafc; color: #1e293b; border: 1px solid var(--card-border); }
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); display: flex; justify-content: flex-end; z-index: 50; }
+.drawer { width: 520px; max-width: 94vw; height: 100%; background: #fff; box-shadow: -8px 0 30px rgba(0,0,0,.18); padding: 24px 26px; overflow-y: auto; animation: slidein .18s ease; }
+@keyframes slidein { from { transform: translateX(30px); opacity: .6; } to { transform: translateX(0); opacity: 1; } }
 .code-block { background: #0f172a; color: #e2e8f0; font-family: var(--mono); font-size: 12.5px; padding: 14px 16px; border-radius: 8px; overflow: auto; white-space: pre; }
 .divider { height: 1px; background: var(--card-border); margin: 16px 0; }
 .check { color: var(--green); font-weight: 700; }

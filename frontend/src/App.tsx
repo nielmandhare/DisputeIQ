@@ -25,6 +25,7 @@ import Dossier from './pages/Dossier';
 import Approval from './pages/Approval';
 import Submitted from './pages/Submitted';
 import EvidenceIssue from './pages/EvidenceIssue';
+import Evidence from './pages/Evidence';
 import AIAnalysis from './pages/AIAnalysis';
 import Audit from './pages/Audit';
 
@@ -47,7 +48,7 @@ export default function App() {
       <Route path="/disputes/:id/submitted" element={<Shell breadcrumbs={<DisputeBreadcrumb suffix="Submitted" />}><Submitted /></Shell>} />
       <Route path="/disputes/:id/evidence-issue" element={<Shell breadcrumbs={<DisputeBreadcrumb suffix="Evidence Issue" />}><EvidenceIssue /></Shell>} />
       <Route path="/disputes/:id/audit" element={<Shell breadcrumbs={<DisputeBreadcrumb suffix="Audit Trail" />}><Audit /></Shell>} />
-      <Route path="/evidence" element={<Shell breadcrumbs={<><b>DisputeIQ</b> / Evidence</>}><Placeholder title="Evidence" text="Evidence workspace for all disputes will appear here." /></Shell>} />
+      <Route path="/evidence" element={<Shell breadcrumbs={<><b>DisputeIQ</b> / Evidence</>}><Evidence /></Shell>} />
       <Route path="/ai-analysis" element={<Shell breadcrumbs={<><b>DisputeIQ</b> / AI Analysis</>}><AIAnalysis /></Shell>} />
       <Route path="/activity" element={<Shell breadcrumbs={<><b>DisputeIQ</b> / Activity</>}><Placeholder title="Activity" text="Cross-dispute activity feed will appear here." /></Shell>} />
       <Route path="/settings" element={<Shell breadcrumbs={<><b>DisputeIQ</b> / Settings</>}><Settings /></Shell>} />

@@ -8,7 +8,7 @@ import { handleWebhook } from './services/razorpay/webhooks.js';
 import { listDisputes, getDisputeById } from './repositories/disputes.js';
 import { listAuditForDispute, exportAuditCSV, exportAuditJSON } from './services/audit.js';
 import { seedSimulatedDispute } from './dev/seed.js';
-import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification } from './repositories/evidence.js';
+import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification, listAll, evidenceStats } from './repositories/evidence.js';
 import { listForDispute as listContradictions, detectAndStoreContradictions, markReviewed } from './repositories/contradictions.js';
 import { listForEvidence as listTimeline, listForDispute as listTimelineDispute, runTimelineExtraction } from './repositories/timeline.js';
 import { computeAndStoreErs, getErs, getGaps } from './repositories/ers.js';
@@ -114,6 +114,15 @@ app.post('/api/disputes/:id/evidence', (req, res) => {
 });
 app.get('/api/disputes/:id/evidence', (req, res) => {
   res.json(listForDispute(req.params.id));
+});
+// Cross-dispute evidence intelligence (Checkpoint 4) — declared BEFORE /:id so
+// '/api/evidence/stats' is not swallowed by the ':id' param route.
+app.get('/api/evidence', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 500, 1000);
+  res.json(listAll(limit));
+});
+app.get('/api/evidence/stats', (_req, res) => {
+  res.json(evidenceStats());
 });
 app.get('/api/evidence/:id', (req, res) => {
   const ev = getEvidenceById(req.params.id); // detail: includes extractedText + classification
