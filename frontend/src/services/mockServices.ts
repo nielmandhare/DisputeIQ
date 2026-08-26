@@ -302,4 +302,40 @@ export const submissionService = {
   },
 };
 
+// Synthetic evaluation environment (Checkpoint 2). Calls the REAL backend
+// SyntheticDisputeProvider — no mock fallback, because the whole point is to
+// visibly load real synthetic records through the pipeline.
+export interface DemoLoadResult {
+  provider: 'demo';
+  loaded: number;
+  evidenceCount: number;
+  ocrRequired: number;
+  scenarioDistribution: Record<string, number>;
+  datasetSeed: number;
+  note?: string;
+}
+
+export const demoService = {
+  // Load the synthetic dispute environment through the real backend pipeline.
+  async load(count = 100): Promise<DemoLoadResult> {
+    const res = await fetch(`${API_BASE}/api/demo/seed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count }),
+    });
+    if (!res.ok) throw new Error(`Synthetic load failed (${res.status})`);
+    return (await res.json()) as DemoLoadResult;
+  },
+  // Clear the synthetic disputes from the DB.
+  async clear(): Promise<{ cleared: number }> {
+    const res = await fetch(`${API_BASE}/api/demo/seed`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Synthetic clear failed (${res.status})`);
+    return (await res.json()) as { cleared: number };
+  },
+  // Scenario descriptors (transparency; no secrets).
+  async dataset() {
+    return apiGet<{ synthetic: true; count: number; disputes: Array<{ id: string; scenarioKey: string; scenarioLabel: string; reasonCode: string; amountInr: number; groundTruth: unknown }> }>('/api/demo/dataset');
+  },
+};
+
 export { OCR_ISSUE_DOC };

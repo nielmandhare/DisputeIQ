@@ -30,3 +30,7 @@ backend/test_run.db
 backend.log
 frontend.log
 omniroute.log
+
+# Runtime artifacts (recordings, temp workspaces)
+escape/
+recordings/

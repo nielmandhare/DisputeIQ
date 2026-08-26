@@ -14,7 +14,7 @@ import { listForEvidence as listTimeline, listForDispute as listTimelineDispute,
 import { computeAndStoreErs, getErs, getGaps } from './repositories/ers.js';
 import { generateForDispute, getLatest, approveDraft } from './repositories/responseDraft.js';
 import { submitDispute, getSubmission } from './services/submission.js';
-import { DemoDisputeProvider } from './providers/demoProvider.js';
+import { SyntheticDisputeProvider } from './providers/syntheticProvider.js';
 import { evaluatePopulation, buildEvaluationReport } from './services/evaluation.js';
 
 function safeJson(s) {
@@ -250,7 +250,7 @@ app.get('/api/disputes/:id/submission', (req, res) => {
 app.post('/api/demo/seed', (req, res) => {
   try {
     const count = Math.min(Number(req.body?.count) || 100, 500);
-    const result = DemoDisputeProvider.loadDemoDataset(count, { regenerateDrafts: true });
+    const result = SyntheticDisputeProvider.loadDemoDataset(count, { regenerateDrafts: true });
     res.status(201).json({ ...result, note: 'Synthetic evaluation dataset loaded. Not real Razorpay disputes.' });
   } catch (e) {
     res.status(500).json({ error: 'demo_seed_failed', message: e.message });
@@ -259,7 +259,7 @@ app.post('/api/demo/seed', (req, res) => {
 
 app.delete('/api/demo/seed', (_req, res) => {
   try {
-    const cleared = DemoDisputeProvider.clearDemoDataset();
+    const cleared = SyntheticDisputeProvider.clearDemoDataset();
     res.json({ cleared });
   } catch (e) {
     res.status(500).json({ error: 'demo_clear_failed', message: e.message });
@@ -269,7 +269,7 @@ app.delete('/api/demo/seed', (_req, res) => {
 app.get('/api/demo/dataset', (_req, res) => {
   // Returns the raw 100-descriptor dataset (transparency; no secrets).
   try {
-    const ds = DemoDisputeProvider.generateSyntheticDisputes(100);
+    const ds = SyntheticDisputeProvider.generateSyntheticDisputes(100);
     res.json({ synthetic: true, count: ds.length, disputes: ds.map((d) => ({
       id: d.id, provider: d.provider, scenarioKey: d.scenarioKey, scenarioLabel: d.scenarioLabel,
       merchant: d.merchant, customer: d.customer, reasonCode: d.reasonCode, amountInr: d.amountInr,

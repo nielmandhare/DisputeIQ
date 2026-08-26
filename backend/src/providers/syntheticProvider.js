@@ -1,15 +1,21 @@
-// DemoDisputeProvider — ingests the SYNTHETIC 100-dispute evaluation dataset
-// into the local database so the existing DisputeIQ pipeline (classification,
-// timeline, contradiction, ERS, drafting) runs over realistic content.
+// SyntheticDisputeProvider — ingests the SYNTHETIC 100-dispute evaluation
+// dataset into the local database so the existing DisputeIQ pipeline
+// (classification, timeline, contradiction, ERS, drafting) runs over realistic
+// content.
 //
-// This is STRICTLY a demo/evaluation data source. It is kept fully separate
-// from RazorpayDisputeProvider. Synthetic disputes are stamped provider='demo'
-// and ids use the `dupu_demo_###` namespace so they can never be confused with
-// real Razorpay disputes (`dupu_...`).
+// This is STRICTLY a synthetic evaluation/demo data source. It is kept fully
+// separate from RazorpayDisputeProvider. Synthetic disputes are stamped
+// provider='demo' and ids use the `dupu_demo_###` namespace so they can never
+// be confused with real Razorpay disputes (`dupu_...`). The synthetic records
+// are clearly labelled (raw.synthetic:true).
 //
 // Ingestion is HEURISTIC and DETERMINISTIC (no LLM calls) so loading 100
 // disputes is fast and free, and the evaluation is reproducible. Per-dispute
 // LLM analysis remains available on demand via the normal API.
+//
+// The dataset itself is NOT regenerated here — it is produced by
+// syntheticDataset.js (deterministic, seeded). This provider only loads it
+// through the real pipeline and records real audit events.
 import { db, now } from '../db.js';
 import { config } from '../config.js';
 import { randomUUID } from 'node:crypto';
@@ -18,6 +24,7 @@ import { detectAndStoreContradictions } from '../repositories/contradictions.js'
 import { runTimelineExtraction } from '../repositories/timeline.js';
 import { computeAndStoreErs } from '../repositories/ers.js';
 import { generateForDispute, approveDraft } from '../repositories/responseDraft.js';
+import { recordAudit } from '../services/audit.js';
 
 const REASON_LABELS = {
   non_receipt_of_goods: 'Non-receipt of goods',
@@ -44,6 +51,12 @@ function ensureDemoDispute(d) {
     'pre_dispute', 'open', d.createdAt, d.deadlineAt,
     JSON.stringify({ scenario: d.scenarioKey, synthetic: true }), ts, ts,
   );
+  // Real audit event: the synthetic dispute entered the system.
+  recordAudit({
+    actor: 'SYSTEM', eventType: 'DISPUTE_RECEIVED', entityType: 'DISPUTE', entityId: internalId,
+    statusText: `Synthetic dispute ${d.id} (${d.scenarioKey}) loaded via SyntheticDisputeProvider`,
+    metadata: { scenario: d.scenarioKey, reasonCode: d.reasonCode, synthetic: true },
+  });
   return internalId;
 }
 
@@ -71,41 +84,44 @@ function insertEvidence(internalId, ev) {
 
 /**
  * Load `count` synthetic disputes (default 100) into the DB and run the
- * heuristic pipeline (contradiction + ERS + draft) over each. Returns a summary.
+ * heuristic pipeline (contradiction + ERS + draft) over each. Returns a summary
+ * including the real scenario distribution so the UI can display it.
  */
 export function loadDemoDataset(count = 100, { regenerateDrafts = true, seed = 20260601 } = {}) {
   const disputes = generateSyntheticDisputes(count, seed);
   const loadedIds = [];
   let evidenceCount = 0;
   let ocrCount = 0;
+  const scenarioCounts = {};
   // Force HEURISTIC drafting during bulk ingestion so loading 100 disputes is
   // fast + free (no 100 LLM calls). Real LLM analysis stays available per-dispute.
   const savedKey = config.llm.apiKey;
   config.llm.apiKey = '';
   try {
-  for (const d of disputes) {
-    const internalId = ensureDemoDispute(d);
-    loadedIds.push(internalId);
-    for (const ev of d.evidence) {
-      const evId = insertEvidence(internalId, ev);
-      evidenceCount++;
-      if (ev.ocrRequired) ocrCount++;
-      else if (ev.text) { try { runTimelineExtraction(evId); } catch { /* non-fatal */ } }
+    for (const d of disputes) {
+      const internalId = ensureDemoDispute(d);
+      loadedIds.push(internalId);
+      scenarioCounts[d.scenarioKey] = (scenarioCounts[d.scenarioKey] || 0) + 1;
+      for (const ev of d.evidence) {
+        const evId = insertEvidence(internalId, ev);
+        evidenceCount++;
+        if (ev.ocrRequired) ocrCount++;
+        else if (ev.text) { try { runTimelineExtraction(evId); } catch { /* non-fatal */ } }
+      }
+      detectAndStoreContradictions(internalId);
+      computeAndStoreErs(internalId);
+      if (regenerateDrafts) {
+        try {
+          generateForDispute(internalId);
+          // Approve drafts that are valid + fully grounded so they are contest-ready
+          // in the demo queue (the human still gates any real submission).
+          const draft = db.prepare('SELECT status, valid, metrics FROM response_drafts WHERE disputeId=? ORDER BY draftVersion DESC LIMIT 1').get(internalId);
+          if (draft && draft.status === 'DRAFT_READY' && draft.valid) {
+            try { approveDraft(internalId); } catch { /* non-fatal */ }
+          }
+        } catch { /* non-fatal */ }
+      }
     }
-    detectAndStoreContradictions(internalId);
-    computeAndStoreErs(internalId);
-    if (regenerateDrafts) {
-      try {
-        generateForDispute(internalId);
-        // Approve drafts that are valid + fully grounded so they are contest-ready
-        // in the demo queue (the human still gates any real submission).
-        const draft = db.prepare('SELECT status, valid, metrics FROM response_drafts WHERE disputeId=? ORDER BY draftVersion DESC LIMIT 1').get(internalId);
-        if (draft && draft.status === 'DRAFT_READY' && draft.valid) {
-          try { approveDraft(internalId); } catch { /* non-fatal */ }
-        }
-      } catch { /* non-fatal */ }
-    }
-  }
   } finally {
     config.llm.apiKey = savedKey;
   }
@@ -114,6 +130,7 @@ export function loadDemoDataset(count = 100, { regenerateDrafts = true, seed = 2
     loaded: loadedIds.length,
     evidenceCount,
     ocrRequired: ocrCount,
+    scenarioDistribution: scenarioCounts,
     datasetSeed: seed,
   };
 }
@@ -127,4 +144,4 @@ export function clearDemoDataset() {
   return rows.length;
 }
 
-export const DemoDisputeProvider = { loadDemoDataset, clearDemoDataset, generateSyntheticDisputes };
+export const SyntheticDisputeProvider = { loadDemoDataset, clearDemoDataset, generateSyntheticDisputes };
