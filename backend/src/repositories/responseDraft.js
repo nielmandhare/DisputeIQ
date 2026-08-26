@@ -3,6 +3,7 @@
 import { db, now } from '../db.js';
 import { randomUUID } from 'node:crypto';
 import { recordAudit } from '../services/audit.js';
+import { recordAiEvent } from '../services/aiEvents.js';
 import { getDisputeById } from './disputes.js';
 import { listForDispute as listEvidence } from './evidence.js';
 import { listForDispute as listTimeline } from './timeline.js';
@@ -94,6 +95,19 @@ export async function generateForDispute(disputeId) {
   db.prepare("UPDATE disputes SET responseStatus = ?, updatedAt = ? WHERE id = ?").run(status, ts, disputeId);
 
   const duration = now() - started;
+  // Real AI-analysis observability: what actually generated this draft.
+  try {
+    const usedLlm = result.generationMethod === 'LLM';
+    recordAiEvent({
+      disputeId, operation: 'RESPONSE_DRAFTING',
+      usedLlm, inputCount: ctx.evidence.length, outputCount: validation.claimCount,
+      confidence: validation.coverage, durationMs: duration * 1000, status: 'COMPLETED',
+      metadata: {
+        generationMethod: result.generationMethod, fallbackUsed, draftVersion, status,
+        coverage: validation.coverage, valid: validation.valid,
+      },
+    });
+  } catch { /* non-fatal */ }
   recordAudit({
     actor: 'AI ENGINE', eventType: 'DRAFT_GENERATED', entityType: 'RESPONSE_DRAFT', entityId: id,
     statusText: `v${draftVersion} via ${result.generationMethod}${fallbackUsed ? ' (heuristic fallback)' : ''}`,

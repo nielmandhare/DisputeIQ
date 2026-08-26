@@ -13,6 +13,9 @@ export const IconEvidence = ({ size }: IconProps) => (
 export const IconActivity = ({ size }: IconProps) => (
   <svg {...S(size)}><path d="M3 12h4l3 8 4-16 3 8h4" /></svg>
 );
+export const IconAI = ({ size }: IconProps) => (
+  <svg {...S(size)}><rect x="5" y="5" width="14" height="14" rx="3" /><path d="M9 9h6v6H9z" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+);
 export const IconSettings = ({ size }: IconProps) => (
   <svg {...S(size)}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 14.1 1.7 1.7 0 0 0 1.9 13V11a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 7 12.6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 12 17.9h.1A1.7 1.7 0 0 0 13 19.4V21" /></svg>
 );

@@ -338,4 +338,34 @@ export const demoService = {
   },
 };
 
+// AI Observability (Checkpoint 3) — real backend AI-analysis events + provider.
+export interface AiEvent {
+  id: string;
+  disputeId: string | null;
+  evidenceId: string | null;
+  operation: 'EVIDENCE_CLASSIFICATION' | 'TIMELINE_EXTRACTION' | 'RESPONSE_DRAFTING';
+  provider: string;
+  model: string;
+  method: 'LLM' | 'HEURISTIC';
+  status: 'COMPLETED' | 'FAILED';
+  inputCount: number | null;
+  outputCount: number | null;
+  confidence: number | null;
+  durationMs: number;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export const aiService = {
+  async provider() {
+    return apiGet<{ provider: string; model: string; modelId: string; configured: boolean; baseUrl: string; llmActive: boolean }>('/api/ai/provider');
+  },
+  async eventsForDispute(id: string) {
+    return apiGet<AiEvent[]>(`/api/disputes/${id}/ai-events`);
+  },
+  async events(limit = 200) {
+    return apiGet<AiEvent[]>(`/api/ai-events?limit=${limit}`);
+  },
+};
+
 export { OCR_ISSUE_DOC };

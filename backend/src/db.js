@@ -187,7 +187,28 @@ db.prepare(`CREATE TABLE IF NOT EXISTS response_drafts (
 addColumnIfMissing('disputes', 'ers', 'INTEGER');
 addColumnIfMissing('disputes', 'ersBreakdown', 'TEXT');
 
-// Slice 8 — submission state machine (human-gated, never autonomous).
+// AI-analysis observability: every real LLM/HEURISTIC engine execution is
+// recorded here so the UI can show what actually ran (provider, model, method,
+// duration, input/output, confidence, status) — honest, no fabrication.
+db.exec(`CREATE TABLE IF NOT EXISTS ai_analysis_events (
+  id          TEXT PRIMARY KEY,
+  disputeId   TEXT,
+  evidenceId  TEXT,
+  operation   TEXT NOT NULL,                -- EVIDENCE_CLASSIFICATION | TIMELINE_EXTRACTION | RESPONSE_DRAFTING
+  provider    TEXT NOT NULL,                -- Omniroute | OpenRouter | heuristic
+  model       TEXT NOT NULL,                -- Claude Sonnet 4.5 | heuristic
+  method      TEXT NOT NULL,                -- LLM | HEURISTIC
+  status      TEXT NOT NULL,                -- COMPLETED | FAILED
+  inputCount  INTEGER,
+  outputCount INTEGER,
+  confidence  INTEGER,
+  durationMs  INTEGER NOT NULL,
+  timestamp   INTEGER NOT NULL,
+  metadata    TEXT,
+  requestId   TEXT
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_event_dispute ON ai_analysis_events(disputeId);`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_event_evidence ON ai_analysis_events(evidenceId);`);
 db.prepare(`CREATE TABLE IF NOT EXISTS submissions (
   id TEXT PRIMARY KEY,
   disputeId TEXT NOT NULL,

@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom';
 import {
-  IconOverview, IconDisputes, IconEvidence, IconActivity, IconSettings, IconHelp,
+  IconOverview, IconDisputes, IconEvidence, IconActivity, IconSettings, IconHelp, IconAI,
 } from '../Icons';
 
 const nav = [
   { to: '/overview', label: 'Overview', Icon: IconOverview },
   { to: '/disputes', label: 'Disputes', Icon: IconDisputes },
   { to: '/evidence', label: 'Evidence', Icon: IconEvidence },
+  { to: '/ai-analysis', label: 'AI Analysis', Icon: IconAI },
   { to: '/activity', label: 'Activity', Icon: IconActivity },
 ];
 

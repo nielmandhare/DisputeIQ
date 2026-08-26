@@ -103,6 +103,14 @@ ul { list-style: none; }
   border-radius: var(--radius); box-shadow: var(--shadow-card);
 }
 .card-pad { padding: 20px 22px; }
+/* ===== AI Observability (Checkpoint 3) ===== */
+.ai-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 18px; }
+.ai-cell { display: flex; flex-direction: column; gap: 3px; }
+.ai-cell .muted { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.ai-cell b { font-size: 15px; color: var(--text-primary); }
+.ai-row:hover { background: #fafbfd; }
+.green { color: #16a34a !important; }
+.amber { color: #d97706 !important; }
 .card-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-secondary); }
 .card-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 

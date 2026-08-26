@@ -13,6 +13,7 @@
 // never silently persisted.
 import { config } from '../config.js';
 import { callLLM as callLLMShared } from './llm.js';
+import { recordAiEvent } from './aiEvents.js';
 import { parseDate, parseTime, DATE_RE, TIME_RE } from './dateUtils.js';
 
 export const EVENT_TYPES = [
@@ -175,7 +176,8 @@ function normalizeLLM(raw, model, { filename, mimeType }) {
 }
 
 // ---- Public entry ----
-export async function extractFactualEvents({ extractedText, filename, mimeType } = {}) {
+export async function extractFactualEvents({ extractedText, filename, mimeType, disputeId, evidenceId } = {}) {
+  const t0 = Date.now();
   const text = (extractedText || '').trim();
   const meta = {
     provider: config.llm.apiKey ? 'LLM' : 'HEURISTIC',
@@ -253,6 +255,15 @@ export async function extractFactualEvents({ extractedText, filename, mimeType }
   meta.eventCount = events.length;
   meta.rejectedCount = rejected.length;
   if (rejected.length) meta.validationStatus = events.length ? 'partial' : 'rejected';
+  try {
+    recordAiEvent({
+      disputeId, evidenceId, operation: 'TIMELINE_EXTRACTION',
+      usedLlm: meta.provider === 'LLM', inputCount: 1, outputCount: events.length,
+      confidence: events.length ? Math.round(events.reduce((a, e) => a + (e.confidence || 0), 0) / events.length) : null,
+      durationMs: Date.now() - t0, status: 'COMPLETED',
+      metadata: { filename: filename || null, rejectedCount: rejected.length, fallbackReason: meta.fallbackReason || null },
+    });
+  } catch { /* non-fatal */ }
   return { events, rejected, meta };
 }
 

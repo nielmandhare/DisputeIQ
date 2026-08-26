@@ -14,6 +14,7 @@
 //                    method, model?, sourceText? }
 import { config } from '../config.js';
 import { callLLM as callLLMShared } from './llm.js';
+import { recordAiEvent } from './aiEvents.js';
 
 // ---- Taxonomy (closed set; keep in sync with frontend if surfaced) ----
 export const EVIDENCE_TYPES = [
@@ -131,8 +132,11 @@ function normalizeLLM(raw, model) {
 }
 
 // Public entry. Runs LLM if configured, else heuristic. LLM failure -> heuristic.
-export async function classifyEvidence({ extractedText, filename } = {}) {
+// Records a real AI-analysis event (provider/model/method/duration/confidence)
+// so the observability panel reflects exactly what executed.
+export async function classifyEvidence({ extractedText, filename, disputeId, evidenceId } = {}) {
   const text = (extractedText || '').trim();
+  const t0 = Date.now();
   if (!text) {
     return {
       evidenceType: 'OTHER',
@@ -143,20 +147,35 @@ export async function classifyEvidence({ extractedText, filename } = {}) {
       error: 'NO_TEXT',
     };
   }
+  let usedLlm = false;
+  let result;
   if (config.llm.apiKey) {
     try {
       const { raw, model } = await callLLM(text);
       const norm = normalizeLLM({ ...raw, _text: text }, model);
       if (norm) {
-        return { ...norm, sourceText: text.slice(0, 200) };
+        usedLlm = true;
+        result = { ...norm, sourceText: text.slice(0, 200) };
       }
       // Schema invalid -> fall through to heuristic.
     } catch (e) {
       // Transparent fallback; record reason.
       const h = heuristicClassify(text);
-      return { ...h, fallbackReason: String(e.message).slice(0, 160), sourceText: text.slice(0, 200) };
+      result = { ...h, fallbackReason: String(e.message).slice(0, 160), sourceText: text.slice(0, 200) };
     }
   }
-  const h = heuristicClassify(text);
-  return { ...h, sourceText: text.slice(0, 200) };
+  if (!result) {
+    const h = heuristicClassify(text);
+    result = { ...h, sourceText: text.slice(0, 200) };
+  }
+  try {
+    recordAiEvent({
+      disputeId, evidenceId, operation: 'EVIDENCE_CLASSIFICATION',
+      usedLlm, inputCount: 1, outputCount: 1,
+      confidence: result.confidence || null, durationMs: Date.now() - t0,
+      status: 'COMPLETED',
+      metadata: { filename: filename || null, evidenceType: result.evidenceType, fallbackReason: result.fallbackReason || null },
+    });
+  } catch { /* non-fatal: observability must never break the pipeline */ }
+  return result;
 }

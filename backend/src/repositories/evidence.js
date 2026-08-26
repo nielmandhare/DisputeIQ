@@ -92,7 +92,7 @@ export async function runClassification(id) {
   if (!row.extractedText) {
     return getEvidenceById(id); // nothing to classify
   }
-  const cls = await classifyEvidence({ extractedText: row.extractedText, filename: row.filename });
+  const cls = await classifyEvidence({ extractedText: row.extractedText, filename: row.filename, disputeId: row.disputeId, evidenceId: id });
   const ts = now();
   db.prepare(`UPDATE evidence_documents SET evidenceType=?, confidence=?, classificationMethod=?,
     classificationSource=?, classificationError=?, updatedAt=? WHERE id=?`).run(

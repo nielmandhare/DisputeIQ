@@ -17,11 +17,29 @@ export function llmConfigured() {
 
 export function llmProviderInfo() {
   const base = config.llm.baseUrl || 'https://openrouter.ai/api/v1';
+  const model = config.llm.model || 'openai/gpt-4o-mini';
+  // Resolve the REAL provider brand from the configured endpoint. Omniroute is
+  // our self-hosted OpenAI-compatible gateway (localhost:20128) that fronts
+  // Claude Sonnet 4.5 — never mislabel it as a generic "openai-compatible" endpoint.
+  const isOmniroute = base.includes('omniroute') || base.includes(':20128') || base.includes('20128');
   const isOpenRouter = base.includes('openrouter.ai');
+  let provider;
+  if (isOmniroute) provider = 'Omniroute';
+  else if (isOpenRouter) provider = 'OpenRouter';
+  else provider = 'OpenAI-compatible';
+  // Human-readable model label. The configured model id may be a deployment
+  // alias (e.g. "DisputeIQ"); surface both the raw id and the underlying model
+  // so observability is honest about what actually ran.
+  let modelLabel = model;
+  if (isOmniroute) {
+    // Omniroute fronts Claude Sonnet 4.5 for DisputeIQ.
+    modelLabel = 'Claude Sonnet 4.5';
+  }
   return {
     baseUrl: base,
-    model: config.llm.model || 'openai/gpt-4o-mini',
-    provider: isOpenRouter ? 'openrouter' : 'openai-compatible',
+    model: model,
+    modelLabel,
+    provider,
     configured: config.llmConfigured,
   };
 }

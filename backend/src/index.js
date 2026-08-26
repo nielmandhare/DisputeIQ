@@ -16,6 +16,7 @@ import { generateForDispute, getLatest, approveDraft } from './repositories/resp
 import { submitDispute, getSubmission } from './services/submission.js';
 import { SyntheticDisputeProvider } from './providers/syntheticProvider.js';
 import { evaluatePopulation, buildEvaluationReport } from './services/evaluation.js';
+import { aiProviderStatus, listForDispute as listAiEventsForDispute, listAll as listAiEventsAll } from './services/aiEvents.js';
 
 function safeJson(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
@@ -296,6 +297,23 @@ app.get('/api/evaluation/report', (_req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'report_failed', message: e.message });
   }
+});
+
+// ---- AI Observability (Checkpoint 3) ----
+// Honest provider/model identification for the AI panel.
+app.get('/api/ai/provider', (_req, res) => {
+  res.json(aiProviderStatus());
+});
+
+// Per-dispute AI-analysis events (what actually ran for this dispute).
+app.get('/api/disputes/:id/ai-events', (req, res) => {
+  res.json(listAiEventsForDispute(req.params.id));
+});
+
+// Cross-dispute AI-analysis feed (most recent first).
+app.get('/api/ai-events', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 200, 500);
+  res.json(listAiEventsAll(limit));
 });
 
 // 404

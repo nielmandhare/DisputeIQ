@@ -24,7 +24,7 @@ export async function runTimelineExtraction(id) {
   const started = now();
   let result;
   try {
-    result = await extractFactualEvents({ extractedText: row.extractedText, filename: row.filename, mimeType: row.mimeType });
+    result = await extractFactualEvents({ extractedText: row.extractedText, filename: row.filename, mimeType: row.mimeType, disputeId: row.disputeId, evidenceId: id });
   } catch (e) {
     db.prepare("UPDATE evidence_documents SET timelineStatus=?, updatedAt=? WHERE id=?").run('TIMELINE_FAILED', now(), id);
     recordAudit({ actor: 'AI ENGINE', eventType: 'TIMELINE_FAILED', entityType: 'EVIDENCE', entityId: id, statusText: String(e.message).slice(0, 160) });
