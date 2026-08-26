@@ -135,12 +135,18 @@ export function loadDemoDataset(count = 100, { regenerateDrafts = true, seed = 2
   };
 }
 
-/** Clear all demo disputes (and their cascaded evidence/contradictions/etc). */
+/** Clear all demo disputes (and their cascaded evidence/contradictions/etc),
+ *  plus the audit + AI-analysis events that reference them, so a reseed starts clean. */
 export function clearDemoDataset() {
   const rows = db.prepare("SELECT id FROM disputes WHERE provider='demo'").all();
   for (const r of rows) {
     db.prepare('DELETE FROM disputes WHERE id=?').run(r.id);
   }
+  // Audit events reference disputes via entityId (not a FK) — clean them explicitly.
+  db.prepare("DELETE FROM audit_events WHERE entityType='DISPUTE' AND entityId IN (SELECT id FROM disputes WHERE provider='demo')").run();
+  db.prepare("DELETE FROM audit_events WHERE entityType='EVIDENCE' AND entityId IN (SELECT id FROM evidence_documents WHERE disputeId IN (SELECT id FROM disputes WHERE provider='demo'))").run();
+  db.prepare("DELETE FROM audit_events WHERE entityType='WEBHOOK_EVENT'").run();
+  db.prepare("DELETE FROM ai_analysis_events WHERE disputeId IN (SELECT id FROM disputes WHERE provider='demo')").run();
   return rows.length;
 }
 

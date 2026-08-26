@@ -37,8 +37,37 @@ export function listAuditForDispute(disputeId) {
     actor: r.actor,
     statusText: r.statusText,
     badge: badgeFor(r.eventType),
+    entityType: r.entityType || undefined,
+    entityId: r.entityId || undefined,
     metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
   }));
+}
+
+// Cross-dispute activity feed (Checkpoint 5 — global Activity page).
+// Returns the most recent audit events across all entities, with optional
+// actor/entityType filters parsed from query string.
+export function listAuditAll({ limit = 200, actor, entityType } = {}) {
+  const where = [];
+  const params = [];
+  if (actor) { where.push('actor = ?'); params.push(actor); }
+  if (entityType) { where.push('entityType = ?'); params.push(entityType); }
+  const sql = `SELECT * FROM audit_events ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY timestamp DESC LIMIT ?`;
+  const rows = db.prepare(sql).all(...params, limit);
+  return rows.map((r) => ({
+    id: r.id,
+    timestamp: new Date(r.timestamp * 1000).toISOString(),
+    eventType: r.eventType,
+    actor: r.actor,
+    statusText: r.statusText,
+    badge: badgeFor(r.eventType),
+    entityType: r.entityType || undefined,
+    entityId: r.entityId || undefined,
+    metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
+  }));
+}
+
+export function auditCount() {
+  return db.prepare('SELECT COUNT(*) c FROM audit_events').get().c;
 }
 
 export function exportAuditCSV(disputeId) {

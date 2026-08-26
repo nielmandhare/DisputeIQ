@@ -271,11 +271,18 @@ export const responseDraftService = {
 
 export const auditService = {
   async listForDispute(id: string): Promise<AuditEvent[]> {
+    const live = await apiGet<AuditEvent[]>(`/api/disputes/${id}/audit`);
+    if (live) return live; // real backend audit trail
     await delay(100);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
-    return d?.audit ?? DEMO_AUDIT;
+    return d?.audit ?? DEMO_AUDIT; // mock fallback only if backend down
+  },
+  async listAll(limit = 200): Promise<{ total: number; events: AuditEvent[] } | null> {
+    return apiGet<{ total: number; events: AuditEvent[] }>(`/api/audit?limit=${limit}`);
   },
   async exportCSV(id: string): Promise<string> {
+    const live = await apiGet<string>(`/api/disputes/${id}/audit.csv`);
+    if (live) return live;
     await delay(100);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     const rows = (d?.audit ?? DEMO_AUDIT).map((e) =>
@@ -283,6 +290,8 @@ export const auditService = {
     return ['timestamp,event_type,actor,status', ...rows].join('\n');
   },
   async exportJSON(id: string): Promise<string> {
+    const live = await apiGet<AuditEvent[]>(`/api/disputes/${id}/audit`);
+    if (live) return JSON.stringify(live, null, 2);
     await delay(100);
     const d = DEMO_DISPUTES.find((x) => x.id === id);
     return JSON.stringify(d?.audit ?? DEMO_AUDIT, null, 2);

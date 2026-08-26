@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { auditService } from '../services/mockServices';
 import { AuditEvent } from '../types';
 
@@ -8,7 +8,11 @@ export default function Audit() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
-  useEffect(() => { auditService.listForDispute(id).then(setEvents); }, [id]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    setLoading(true);
+    auditService.listForDispute(id).then((e) => { setEvents(e); setLoading(false); });
+  }, [id]);
 
   const exportFile = async (fmt: 'csv' | 'json') => {
     setDownloading(fmt);
@@ -24,18 +28,22 @@ export default function Audit() {
   return (
     <>
       <div className="page-title" style={{ fontSize: 24 }}>Audit Trail</div>
-      <div className="page-sub">Immutable record of all dispute activity.</div>
+      <div className="page-sub">
+        Immutable, backend-backed record of every action on <span className="mono">{id}</span>.
+      </div>
 
       <div className="actionbar">
-        <select className="btn btn-ghost"><option>Event type: All</option></select>
-        <select className="btn btn-ghost"><option>Date range: All time</option></select>
-        <select className="btn btn-ghost"><option>Actor: All</option></select>
+        <Link to={`/disputes/${id}`} className="link-blue" style={{ fontWeight: 600 }}>← Back to dispute</Link>
         <div className="spacer" />
         <button className="btn btn-ghost" disabled={!!downloading} onClick={() => exportFile('csv')}>Export CSV</button>
         <button className="btn btn-ghost" disabled={!!downloading} onClick={() => exportFile('json')}>Export JSON</button>
       </div>
 
       <div className="card">
+        {loading && <div className="muted" style={{ padding: 18 }}>Loading audit trail…</div>}
+        {!loading && events.length === 0 && (
+          <div className="muted" style={{ padding: 18 }}>No audit events recorded for this dispute yet.</div>
+        )}
         {events.map((e) => (
           <div key={e.id} style={{ borderBottom: '1px solid var(--row-divider)', padding: '14px 18px' }}>
             <div className="row between" style={{ cursor: 'pointer' }} onClick={() => setExpanded((x) => (x === e.id ? null : e.id))}>
@@ -51,7 +59,7 @@ export default function Audit() {
             </div>
             {expanded === e.id && e.metadata && (
               <div className="code-block" style={{ marginTop: 10, background: '#f1f5f9', color: '#1e293b' }}>
-                {`CONTRADICTION DETECTED METADATA\n${JSON.stringify(e.metadata, null, 2)}`}
+                {JSON.stringify(e.metadata, null, 2)}
               </div>
             )}
           </div>

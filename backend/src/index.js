@@ -6,7 +6,7 @@ import { config } from './config.js';
 import { db } from './db.js';
 import { handleWebhook } from './services/razorpay/webhooks.js';
 import { listDisputes, getDisputeById } from './repositories/disputes.js';
-import { listAuditForDispute, exportAuditCSV, exportAuditJSON } from './services/audit.js';
+import { listAuditForDispute, exportAuditCSV, exportAuditJSON, listAuditAll, auditCount } from './services/audit.js';
 import { seedSimulatedDispute } from './dev/seed.js';
 import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification, listAll, evidenceStats } from './repositories/evidence.js';
 import { listForDispute as listContradictions, detectAndStoreContradictions, markReviewed } from './repositories/contradictions.js';
@@ -68,6 +68,13 @@ app.get('/api/disputes/:id', (req, res) => {
 });
 app.get('/api/disputes/:id/audit', (req, res) => {
   res.json(listAuditForDispute(req.params.id));
+});
+// Cross-dispute activity feed (Checkpoint 5 — global Activity page).
+app.get('/api/audit', (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 200, 1000);
+  const actor = req.query.actor ? String(req.query.actor) : undefined;
+  const entityType = req.query.entityType ? String(req.query.entityType) : undefined;
+  res.json({ total: auditCount(), events: listAuditAll({ limit, actor, entityType }) });
 });
 app.get('/api/disputes/:id/audit.csv', (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
