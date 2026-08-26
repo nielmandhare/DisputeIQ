@@ -4,6 +4,7 @@ import express from 'express';
 import multer from 'multer';
 import { config } from './config.js';
 import { db } from './db.js';
+import { llmProviderInfo } from './services/llm.js';
 import { handleWebhook } from './services/razorpay/webhooks.js';
 import { listDisputes, getDisputeById } from './repositories/disputes.js';
 import { listAuditForDispute, exportAuditCSV, exportAuditJSON, listAuditAll, auditCount } from './services/audit.js';
@@ -54,6 +55,40 @@ app.use(express.json());
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, razorpayConfigured: config.razorpayConfigured, devSeed: config.devSeed });
 });
+
+// Product status — everything the UI derives its connection/version indicators from.
+// No hardcoded account ids or version strings on the client; the truth lives here.
+const APP_VERSION = '1.0.0';
+app.get('/api/status', (_req, res) => {
+  const configured = config.razorpayConfigured;
+  const liveMode = configured && (process.env.RAZORPAY_SUBMISSION_MODE || 'simulated').toLowerCase() === 'live';
+  const mode = !configured ? 'NONE' : liveMode ? 'LIVE' : 'TEST';
+  const disputes = listDisputes();
+  const demoCount = disputes.filter((d) => d.provider === 'demo').length;
+  const evidenceRows = db.prepare('SELECT COUNT(*) c FROM evidence_documents').get().c;
+  res.json({
+    ok: true,
+    version: APP_VERSION,
+    razorpay: {
+      configured,
+      mode, // NONE | TEST | LIVE
+      account: configured ? maskKey(process.env.RAZORPAY_KEY_ID) : null,
+      submissionMode: liveMode ? 'LIVE' : 'SIMULATED',
+    },
+    demo: {
+      active: demoCount > 0,
+      disputeCount: demoCount,
+      evidenceCount: evidenceRows,
+    },
+    aiProvider: llmProviderInfo(),
+  });
+});
+
+function maskKey(key) {
+  if (!key) return null;
+  const tail = key.slice(-4);
+  return `${key.slice(0, 6)}…${tail}`;
+}
 
 // Disputes (matches frontend disputeService.list / getById)
 app.get('/api/disputes', (_req, res) => {

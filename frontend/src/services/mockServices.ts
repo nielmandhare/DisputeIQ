@@ -328,6 +328,20 @@ export const submissionService = {
   },
 };
 
+// Product status — derived entirely from the backend (no client-side fabrication
+// of connection state, account ids, or version strings).
+export const statusService = {
+  async get(): Promise<{
+    ok: boolean;
+    version: string;
+    razorpay: { configured: boolean; mode: 'NONE' | 'TEST' | 'LIVE'; account: string | null; submissionMode: string };
+    demo: { active: boolean; disputeCount: number; evidenceCount: number };
+    aiProvider?: { provider: string; model: string };
+  } | null> {
+    return apiGet<any>('/api/status');
+  },
+};
+
 // Synthetic evaluation environment (Checkpoint 2). Calls the REAL backend
 // SyntheticDisputeProvider — no mock fallback, because the whole point is to
 // visibly load real synthetic records through the pipeline.

@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   IconOverview, IconDisputes, IconEvidence, IconActivity, IconSettings, IconHelp, IconAI,
 } from '../Icons';
+import { statusService } from '../../services/mockServices';
 
 const nav = [
   { to: '/overview', label: 'Overview', Icon: IconOverview },
@@ -12,6 +14,21 @@ const nav = [
 ];
 
 export default function Sidebar() {
+  const [rz, setRz] = useState<'NONE' | 'TEST' | 'LIVE' | '?' | null>(null);
+  const [version, setVersion] = useState<string>('');
+
+  useEffect(() => {
+    statusService.get().then((s) => {
+      if (s) {
+        setRz(s.razorpay.mode);
+        setVersion(s.version);
+      }
+    }).catch(() => setRz('?'));
+  }, []);
+
+  const connected = rz === 'TEST' || rz === 'LIVE';
+  const modeLabel = rz === 'LIVE' ? 'Live Mode' : rz === 'TEST' ? 'Test Mode' : rz === 'NONE' ? 'Demo Mode' : 'Connecting…';
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -43,8 +60,8 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="testmode"><span className="dot-green" /> Razorpay Test Mode</div>
-        <div className="testmode-sub">v1.4.2 Connected</div>
+        <div className="testmode"><span className={connected ? 'dot-green' : 'dot-grey'} /> Razorpay {modeLabel}</div>
+        <div className="testmode-sub">v{version || '—'} {connected ? 'Connected' : 'Not connected'}</div>
       </div>
     </aside>
   );

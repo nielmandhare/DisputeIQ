@@ -61,6 +61,7 @@ ul { list-style: none; }
 .sidebar-footer { margin-top: 10px; border-top: 1px solid #1e293b; padding-top: 12px; }
 .testmode { display: flex; align-items: center; gap: 8px; padding: 0 12px; font-size: 13px; color: #cbd5e1; }
 .dot-green { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.dot-grey { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
 .testmode-sub { padding: 2px 12px 0; font-size: 11px; color: #64748b; }
 
 /* ===== Main column ===== */

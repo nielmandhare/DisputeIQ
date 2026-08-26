@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopBar from './components/layout/TopBar';
 import { ReactNode } from 'react';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 function Shell({ children, breadcrumbs }: { children: ReactNode; breadcrumbs: ReactNode }) {
   return (
@@ -34,6 +35,7 @@ import Settings from './pages/Settings';
 import HelpDocs from './pages/HelpDocs';
 
 export default function App() {
+  useKeyboardShortcuts();
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/overview" replace />} />

@@ -28,14 +28,14 @@ export default function HelpDocs() {
       <div className="card-title" style={{ marginTop: 22 }}>Documentation</div>
       <div className="doc-grid">
         {DOCS.map((d) => (
-          <a key={d.title} className="doc-card" href="#">
+          <a key={d.title} className="doc-card" href="#" onClick={(e) => { e.preventDefault(); document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }); }}>
             <div className="doc-title"><span className="doc-icon">{d.icon}</span>{d.title}</div>
             <div className="doc-sub">{d.sub}</div>
           </a>
         ))}
       </div>
 
-      <div className="card-title" style={{ marginTop: 26 }}>Frequently Asked Questions</div>
+      <div id="faq" className="card-title" style={{ marginTop: 26 }}>Frequently Asked Questions</div>
       <div>
         {FAQS.map((f, i) => (
           <div key={f.q} className={`faq-item ${open === i ? 'open' : ''}`}>
@@ -60,11 +60,10 @@ export default function HelpDocs() {
       <div className="card card-pad row between wrap" style={{ gap: 12 }}>
         <div>
           <div style={{ fontWeight: 600 }}>Still need help?</div>
-          <div className="muted" style={{ fontSize: 13 }}>Reach the DisputeIQ team or browse the Razorpay dispute docs.</div>
+          <div className="muted" style={{ fontSize: 13 }}>Browse the official Razorpay dispute documentation for API and webhook references.</div>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <a className="btn btn-ghost" href="#">Razorpay Docs ↗</a>
-          <a className="btn btn-primary" href="#">Contact Support</a>
+          <a className="btn btn-ghost" href="https://razorpay.com/docs/api/disputes" target="_blank" rel="noreferrer">Razorpay Docs ↗</a>
         </div>
       </div>
     </>

@@ -1,170 +1,119 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '../components/Alert';
+import { statusService, demoService } from '../services/mockServices';
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="switch">
-      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
-      <span className="slider" />
-    </label>
-  );
-}
-
-const INPUT: React.CSSProperties = {
-  width: 320, maxWidth: '100%', padding: '9px 12px', borderRadius: 8,
-  border: '1px solid var(--card-border)', fontSize: 14, fontFamily: 'inherit',
-};
+type Status = {
+  ok: boolean;
+  version: string;
+  razorpay: { configured: boolean; mode: 'NONE' | 'TEST' | 'LIVE'; account: string | null; submissionMode: string };
+  demo: { active: boolean; disputeCount: number; evidenceCount: number };
+  aiProvider?: { provider: string; model: string };
+} | null;
 
 export default function Settings() {
-  const [merchantName, setMerchantName] = useState('Niel Mandhare');
-  const [email, setEmail] = useState('nielmandhare1@gmail.com');
-  const [tz, setTz] = useState('Asia/Kolkata (IST)');
-
-  const [testMode, setTestMode] = useState(true);
-  const [autoIngest, setAutoIngest] = useState(true);
-  const [aiContradiction, setAiContradiction] = useState(true);
-  const [emailDigest, setEmailDigest] = useState(false);
-  const [demoData, setDemoData] = useState(true);
-
-  const [saved, setSaved] = useState(false);
+  const [status, setStatus] = useState<Status>(null);
+  const [resetting, setResetting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
+  const load = () => statusService.get().then(setStatus);
+  useEffect(() => { load(); }, []);
+
+  const doReset = async () => {
+    setResetting(true);
+    setError(null);
+    setResetMsg(null);
+    try {
+      await demoService.clear();
+      const res = await demoService.load(100);
+      setConfirmReset(false);
+      setResetMsg(`Reset complete — ${res.loaded} disputes and ${res.evidenceCount} evidence documents reloaded.`);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'Reset failed. See backend logs.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const rz = status?.razorpay;
+  const rzState =
+    !rz || !rz.configured
+      ? { label: 'Not connected', badge: 'badge-grey', dot: 'dot-grey', detail: 'No Razorpay credentials configured. Running in simulated demo mode.' }
+      : rz.mode === 'LIVE'
+        ? { label: 'Connected — Live API', badge: 'badge-green', dot: 'dot-green', detail: `Live account ${rz.account} · submissions go to real Razorpay.` }
+        : { label: 'Connected — Test API', badge: 'badge-green', dot: 'dot-green', detail: `Test account ${rz.account} · submissions are SIMULATED (no real Razorpay call).` };
 
   return (
     <>
       <div className="page-title" style={{ fontSize: 24 }}>Settings</div>
-      <div className="page-sub">Manage your workspace, Razorpay connection and demo environment.</div>
+      <div className="page-sub">Workspace connection and demo environment controls.</div>
 
-      {saved && <Alert kind="green" icon="check" style={{ marginTop: 12 }}>Preferences saved (demo — not persisted to backend yet).</Alert>}
+      {resetMsg && <Alert kind="green" icon="check" style={{ marginTop: 12 }}>{resetMsg}</Alert>}
+      {error && <Alert kind="red" icon="warn" style={{ marginTop: 12 }}>{error}</Alert>}
 
-      {/* Profile */}
-      <div className="card-title" style={{ marginTop: 22 }}>Profile</div>
-      <div className="card card-pad">
-        <div className="setting-row">
-          <div>
-            <div className="label">Merchant name</div>
-            <div className="desc">Displayed on dossiers and audit entries.</div>
-          </div>
-          <input style={INPUT} value={merchantName} onChange={(e) => setMerchantName(e.target.value)} />
-        </div>
-        <div className="setting-row">
-          <div>
-            <div className="label">Email</div>
-            <div className="desc">Where submission confirmations and digests are sent.</div>
-          </div>
-          <input style={INPUT} value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="setting-row">
-          <div>
-            <div className="label">Time zone</div>
-            <div className="desc">Used for deadlines and audit timestamps.</div>
-          </div>
-          <select className="btn" value={tz} onChange={(e) => setTz(e.target.value)}>
-            <option>Asia/Kolkata (IST)</option>
-            <option>Asia/Dubai (GST)</option>
-            <option>UTC</option>
-            <option>America/New_York (ET)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Razorpay connection */}
+      {/* Razorpay connection — derived from the backend, never hardcoded */}
       <div className="card-title" style={{ marginTop: 22 }}>Razorpay Connection</div>
       <div className="card card-pad">
         <div className="setting-row">
           <div>
-            <div className="label">Test mode</div>
-            <div className="desc">Route calls to Razorpay sandbox credentials. Required for the hackathon build.</div>
+            <div className="label">Connection status</div>
+            <div className="desc">Derived live from the backend. DisputeIQ never fabricates a connection.</div>
           </div>
-          <Toggle on={testMode} onChange={setTestMode} />
+          <span className={`badge ${rzState.badge}`}><span className={rzState.dot} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, marginRight: 6, background: 'currentColor' }} /> {rzState.label}</span>
         </div>
-        <div className="setting-row">
+        <div className="setting-row" style={{ borderBottom: 'none' }}>
           <div>
-            <div className="label">Connected account</div>
-            <div className="kv"><b>razorpay_test_merchant_8K72</b> · v1.4.2 · {testMode ? 'Test' : 'Live'} environment</div>
+            <div className="label">Environment</div>
+            <div className="kv">{rzState.detail}</div>
           </div>
-          <span className="badge badge-green">● Connected</span>
+          <span className="badge badge-grey">v{status?.version ?? '—'}</span>
         </div>
-        {!testMode && (
-          <Alert kind="amber" style={{ marginTop: 10 }}>Live mode is disabled in this demo. Switch back to Test mode to continue exploring.</Alert>
-        )}
       </div>
 
-      {/* Workflow */}
-      <div className="card-title" style={{ marginTop: 22 }}>Workflow</div>
+      {/* AI provider */}
+      <div className="card-title" style={{ marginTop: 22 }}>AI Provider</div>
       <div className="card card-pad">
-        <div className="setting-row">
+        <div className="setting-row" style={{ borderBottom: 'none' }}>
           <div>
-            <div className="label">Auto-ingest new evidence</div>
-            <div className="desc">Automatically run text extraction and classification when a document is uploaded.</div>
+            <div className="label">Analysis engine</div>
+            <div className="desc">Used for evidence classification, timeline extraction and draft generation.</div>
           </div>
-          <Toggle on={autoIngest} onChange={setAutoIngest} />
-        </div>
-        <div className="setting-row">
-          <div>
-            <div className="label">AI contradiction detection</div>
-            <div className="desc">Cross-reference documents for timeline and logic conflicts.</div>
-          </div>
-          <Toggle on={aiContradiction} onChange={setAiContradiction} />
-        </div>
-        <div className="setting-row">
-          <div>
-            <div className="label">Daily email digest</div>
-            <div className="desc">Summary of disputes with approaching deadlines.</div>
-          </div>
-          <Toggle on={emailDigest} onChange={setEmailDigest} />
+          <span className="badge badge-blue">
+            {status?.aiProvider ? `${status.aiProvider.provider} · ${status.aiProvider.model}` : '—'}
+          </span>
         </div>
       </div>
 
-      {/* Demo environment */}
+      {/* Demo environment — the only state-changing controls here are real */}
       <div className="card-title" style={{ marginTop: 22 }}>Demo Environment</div>
       <div className="card card-pad">
         <div className="setting-row">
           <div>
-            <div className="label">Use demo data</div>
-            <div className="desc">Show seeded disputes (e.g. disp_test_8K72) instead of an empty workspace.</div>
+            <div className="label">Synthetic dataset</div>
+            <div className="desc">
+              {status?.demo.active
+                ? `${status.demo.disputeCount} disputes and ${status.demo.evidenceCount} evidence documents currently loaded.`
+                : 'No synthetic disputes loaded.'}
+            </div>
           </div>
-          <Toggle on={demoData} onChange={setDemoData} />
+          <span className={`badge ${status?.demo.active ? 'badge-green' : 'badge-grey'}`}>{status?.demo.active ? 'Active' : 'Empty'}</span>
         </div>
-        <div className="setting-row">
+        <div className="setting-row" style={{ borderBottom: 'none' }}>
           <div>
             <div className="label">Reset demo data</div>
-            <div className="desc">Restore the original seeded disputes and evidence.</div>
+            <div className="desc">Clear all synthetic disputes, evidence and derived state, then reload a fresh 100-dispute dataset. Submissions are also cleared.</div>
           </div>
           {confirmReset ? (
             <div className="row" style={{ gap: 8 }}>
-              <button className="btn btn-primary" onClick={() => { setConfirmReset(false); setSaved(true); setTimeout(() => setSaved(false), 2500); }}>Confirm reset</button>
-              <button className="btn btn-ghost" onClick={() => setConfirmReset(false)}>Cancel</button>
+              <button className="btn btn-primary" disabled={resetting} onClick={doReset}>{resetting ? 'Resetting…' : 'Confirm reset'}</button>
+              <button className="btn btn-ghost" disabled={resetting} onClick={() => setConfirmReset(false)}>Cancel</button>
             </div>
           ) : (
             <button className="btn btn-ghost" onClick={() => setConfirmReset(true)}>Reset</button>
           )}
         </div>
-      </div>
-
-      {/* Danger zone */}
-      <div className="card-title" style={{ marginTop: 22, color: 'var(--red-text)' }}>Danger Zone</div>
-      <div className="card card-pad" style={{ borderColor: 'var(--red-border)' }}>
-        <div className="setting-row" style={{ borderBottom: 'none' }}>
-          <div>
-            <div className="label" style={{ color: 'var(--red-text)' }}>Disconnect Razorpay</div>
-            <div className="desc">Remove stored credentials and sign out of the connected test account.</div>
-          </div>
-          {confirmDisconnect ? (
-            <div className="row" style={{ gap: 8 }}>
-              <button className="btn btn-danger" onClick={() => setConfirmDisconnect(false)}>Confirm disconnect</button>
-              <button className="btn btn-ghost" onClick={() => setConfirmDisconnect(false)}>Cancel</button>
-            </div>
-          ) : (
-            <button className="btn btn-danger-outline" onClick={() => setConfirmDisconnect(true)}>Disconnect</button>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-        <button className="btn btn-primary" onClick={save}>Save changes</button>
       </div>
     </>
   );
