@@ -7,7 +7,7 @@ import { db } from './db.js';
 import { handleWebhook } from './services/razorpay/webhooks.js';
 import { listDisputes, getDisputeById } from './repositories/disputes.js';
 import { listAuditForDispute, exportAuditCSV, exportAuditJSON, listAuditAll, auditCount } from './services/audit.js';
-import { seedSimulatedDispute } from './dev/seed.js';
+import { buildOverview } from './services/overview.js';
 import { createEvidence, listForDispute, getEvidenceMeta, getEvidenceById, runClassification, listAll, evidenceStats } from './repositories/evidence.js';
 import { listForDispute as listContradictions, detectAndStoreContradictions, markReviewed } from './repositories/contradictions.js';
 import { listForEvidence as listTimeline, listForDispute as listTimelineDispute, runTimelineExtraction } from './repositories/timeline.js';
@@ -65,6 +65,10 @@ app.get('/api/disputes/:id', (req, res) => {
   // Attach audit trail (frontend auditService.listForDispute)
   d.audit = listAuditForDispute(req.params.id);
   res.json(d);
+});
+// Command-center overview — all metrics computed from the real backend dataset.
+app.get('/api/overview', (_req, res) => {
+  res.json(buildOverview());
 });
 app.get('/api/disputes/:id/audit', (req, res) => {
   res.json(listAuditForDispute(req.params.id));

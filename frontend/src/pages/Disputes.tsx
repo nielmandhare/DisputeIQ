@@ -22,6 +22,8 @@ export default function Disputes() {
   const [demo, setDemo] = useState<DemoLoadResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sort, setSort] = useState<'deadline' | 'ers' | 'amount' | 'updated'>('deadline');
+  const [showTabs, setShowTabs] = useState(true);
   useEffect(() => { disputeService.list().then(setDisputes); }, []);
 
   const loadSynthetic = async () => {
@@ -50,6 +52,19 @@ export default function Disputes() {
 
   const filtered = disputes.filter(TABS.find((t) => t.key === tab)!.match)
     .filter((d) => d.id.toLowerCase().includes(q.toLowerCase()) || (d.customer || '').toLowerCase().includes(q.toLowerCase()));
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      if (sort === 'ers') return (b.ers || 0) - (a.ers || 0);
+      if (sort === 'amount') return (b.amount || 0) - (a.amount || 0);
+      if (sort === 'updated') return (b.lastUpdated || '').localeCompare(a.lastUpdated || '');
+      // deadline: ascending hours-remaining
+      const h = (t: string) => { const m = /(\d+)h/.exec(t || ''); return m ? Number(m[1]) : 9999; };
+      return h(a.deadlineText) - h(b.deadlineText);
+    });
+    return arr;
+  }, [filtered, sort]);
 
   const empty = showEmpty || (disputes.length === 0 && !demo);
 
@@ -113,10 +128,16 @@ export default function Disputes() {
 
       <div className="actionbar">
         <div className="search"><IconSearch size={16} /><input placeholder="Search disputes..." value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <button className="btn btn-ghost"><IconFilter size={16} /> Filter</button>
-        <button className="btn btn-ghost"><IconSort size={16} /> Sort</button>
+        <button className="btn btn-ghost" onClick={() => setShowTabs((v) => !v)}><IconFilter size={16} /> Filter</button>
+        <select className="btn btn-ghost" value={sort} onChange={(e) => setSort(e.target.value as any)}>
+          <option value="deadline">Sort: Deadline</option>
+          <option value="ers">Sort: ERS</option>
+          <option value="amount">Sort: Amount</option>
+          <option value="updated">Sort: Last updated</option>
+        </select>
       </div>
 
+      {showTabs && (
       <div className="tabs">
         {TABS.map((t) => (
           <div key={t.key} className={`tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
@@ -124,6 +145,7 @@ export default function Disputes() {
           </div>
         ))}
       </div>
+      )}
 
       <div className="table-wrap">
         <table className="grid">
@@ -134,7 +156,7 @@ export default function Disputes() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((d) => (
+            {sorted.map((d) => (
               <tr key={d.id} onClick={() => (window.location.href = `/disputes/${d.id}`)}>
                 <td><span className="link-blue mono">{d.id}</span></td>
                 <td>{d.reasonLabel}</td>

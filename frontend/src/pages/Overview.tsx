@@ -3,65 +3,119 @@ import { Link } from 'react-router-dom';
 import { disputeService } from '../services/mockServices';
 import { ErsBar } from '../components/StatusBadge';
 import { StatusBadge } from '../components/StatusBadge';
-import { OVERVIEW_STATS } from '../data/mockData';
 import { Dispute } from '../types';
 
-const StatCard = ({ label, num, tag, tagCls }: { label: string; num: number; tag: string; tagCls: string }) => (
+interface OverviewData {
+  generatedAt: string;
+  totalDisputes: number;
+  totalAmountInr: number;
+  avgErs: number;
+  buckets: { contestReady: number; needsEvidence: number; hasContradiction: number; submitted: number; resolved: number };
+  evidence: { total: number; extracted: number; ocrRequired: number; failed: number; classified: number; contradictions: number };
+  recentActivity: { id: string; eventType: string; actor: string; statusText: string; entityType?: string; entityId?: string; timestamp: string }[];
+}
+
+const StatCard = ({ label, num, sub, tone }: { label: string; num: string | number; sub?: string; tone?: 'green' | 'amber' | 'red' | 'blue' }) => (
   <div className="stat-card">
     <div className="stat-label">{label}</div>
-    <div className="stat-num">{num}</div>
-    <span className={`stat-tag badge ${tagCls}`}>{tag}</span>
+    <div className={`stat-num${tone === 'green' ? ' green' : tone === 'amber' ? ' amber' : tone === 'red' ? ' red' : ''}`}>{num}</div>
+    {sub && <span className="muted" style={{ fontSize: 12 }}>{sub}</span>}
   </div>
 );
 
+const inr = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
+
 export default function Overview() {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
-  useEffect(() => { disputeService.list().then(setDisputes); }, []);
+  const [ov, setOv] = useState<OverviewData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const priority = disputes.filter((d) => d.status === 'PENDING_REVIEW' || d.status === 'EVIDENCE_MISSING' || d.status === 'CONTRADICTION' || d.status === 'SUBMITTED').slice(0, 5);
-  const s = OVERVIEW_STATS;
+  useEffect(() => {
+    Promise.all([disputeService.list(), disputeService.getOverviewStats()])
+      .then(([d, o]) => { setDisputes(d); setOv(o as OverviewData); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const priority = disputes
+    .filter((d) => ['PENDING_REVIEW', 'CONTRADICTION', 'EVIDENCE_MISSING', 'SUBMITTED'].includes(d.status))
+    .slice(0, 6);
+
+  const b = ov?.buckets;
+  const ev = ov?.evidence;
 
   return (
     <>
       <div className="greeting">Good evening, Niel</div>
-      <div className="greeting-sub">Merchant dispute operations platform</div>
+      <div className="greeting-sub">Merchant dispute operations platform — live command center</div>
 
-      <div className="stat-row">
-        <StatCard label="Active Disputes" num={s.activeDisputes} tag={s.activeDelta} tagCls="badge-amber" />
-        <StatCard label="Needs Review" num={s.needsReview} tag={s.reviewNote} tagCls="badge-red" />
-        <StatCard label="Submitted" num={s.submitted} tag={s.submittedNote} tagCls="badge-grey" />
-        <StatCard label="Resolved" num={s.resolved} tag={s.resolvedNote} tagCls="badge-green" />
-      </div>
+      {loading && <div className="muted" style={{ padding: 18 }}>Loading command center…</div>}
 
-      <div className="card card-pad">
-        <div className="card-title-row">
-          <span className="card-title">Priority Disputes</span>
-          <Link to="/disputes" className="link-blue">View all →</Link>
-        </div>
-        <div className="table-wrap" style={{ boxShadow: 'none', border: 'none' }}>
-          <table className="grid">
-            <thead>
-              <tr>
-                <th>Dispute</th><th>Reason</th><th>Amount</th><th>Deadline</th>
-                <th>Evidence Readiness</th><th>Status</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {priority.map((d) => (
-                <tr key={d.id} onClick={() => (window.location.href = `/disputes/${d.id}`)}>
-                  <td><span className="link-blue mono">{d.id}</span></td>
-                  <td>{d.reasonLabel}</td>
-                  <td className="mono">₹{d.amount.toLocaleString('en-IN')}</td>
-                  <td className={d.deadlineText.includes('18h') || d.deadlineText.includes('8h') ? 'consistency' : 'muted'}>{d.deadlineText}</td>
-                  <td><ErsBar score={d.ers} /></td>
-                  <td><StatusBadge status={d.status} /></td>
-                  <td><Link to={`/disputes/${d.id}`} className="link-blue">{d.status === 'SUBMITTED' ? 'View' : 'Review'} →</Link></td>
-                </tr>
+      {ov && (
+        <>
+          <div className="stat-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <StatCard label="Total Disputes" num={ov.totalDisputes} sub="from live backend" tone="blue" />
+            <StatCard label="Contest-Ready" num={b?.contestReady ?? 0} sub="ERS ≥ 72 & valid draft" tone="green" />
+            <StatCard label="Needs Evidence" num={b?.needsEvidence ?? 0} sub="ERS below bar" tone="amber" />
+            <StatCard label="Has Contradiction" num={b?.hasContradiction ?? 0} sub="requires review" tone="red" />
+          </div>
+
+          <div className="stat-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <StatCard label="Disputed Amount" num={inr(ov.totalAmountInr)} sub="total at risk" />
+            <StatCard label="Avg ERS" num={ov.avgErs} sub="evidence readiness" />
+            <StatCard label="Evidence Docs" num={ev?.total ?? 0} sub={`${ev?.ocrRequired ?? 0} OCR-required`} />
+            <StatCard label="Contradictions" num={ev?.contradictions ?? 0} sub="detected by engine" tone="red" />
+          </div>
+
+          <div className="row" style={{ gap: 18, alignItems: 'flex-start', marginTop: 6 }}>
+            <div className="card card-pad" style={{ flex: 2 }}>
+              <div className="card-title-row">
+                <span className="card-title">Priority Disputes</span>
+                <Link to="/disputes" className="link-blue">View all →</Link>
+              </div>
+              <div className="table-wrap" style={{ boxShadow: 'none', border: 'none' }}>
+                <table className="grid">
+                  <thead>
+                    <tr>
+                      <th>Dispute</th><th>Reason</th><th>Amount</th><th>ERS</th><th>Status</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {priority.map((d) => (
+                      <tr key={d.id} onClick={() => (window.location.href = `/disputes/${d.id}`)}>
+                        <td><span className="link-blue mono">{d.id}</span></td>
+                        <td>{d.reasonLabel}</td>
+                        <td className="mono">₹{d.amount.toLocaleString('en-IN')}</td>
+                        <td><ErsBar score={d.ers} /></td>
+                        <td><StatusBadge status={d.status} /></td>
+                        <td><Link to={`/disputes/${d.id}`} className="link-blue">Review →</Link></td>
+                      </tr>
+                    ))}
+                    {priority.length === 0 && (
+                      <tr><td colSpan={6} className="muted" style={{ padding: 14 }}>No priority disputes.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="card card-pad" style={{ flex: 1 }}>
+              <div className="card-title" style={{ marginBottom: 10 }}>Recent Activity</div>
+              {ov.recentActivity.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No activity yet.</div>}
+              {ov.recentActivity.map((a) => (
+                <div key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--row-divider)' }}>
+                  <div className="row between">
+                    <span className={`badge badge-${a.actor === 'AI ENGINE' ? 'blue' : a.actor === 'SYSTEM' ? 'grey' : 'green'}`} style={{ fontSize: 10 }}>{a.actor}</span>
+                    <span className="mono muted" style={{ fontSize: 11 }}>{a.timestamp.slice(11, 19)}</span>
+                  </div>
+                  <div style={{ fontSize: 13, marginTop: 4 }}>{a.eventType}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{a.statusText}</div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              <Link to="/activity" className="link-blue" style={{ display: 'inline-block', marginTop: 10, fontSize: 13 }}>Full activity feed →</Link>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

@@ -105,8 +105,10 @@ export const disputeService = {
     return DEMO_DISPUTES.find((d) => d.id === id);
   },
   async getOverviewStats() {
+    const live = await apiGet<any>('/api/overview');
+    if (live) return live; // real backend-computed command-center metrics
     await delay(80);
-    return OVERVIEW_STATS;
+    return OVERVIEW_STATS; // mock fallback only if backend is down
   },
   // Simulated webhook trigger (DEMO MODE: no real webhook received)
   async simulateWebhook(): Promise<{ ok: true }> {
