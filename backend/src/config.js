@@ -32,7 +32,7 @@ export const config = {
     apiKey: process.env.LLM_API_KEY || '',
     baseUrl: process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1',
     model: process.env.LLM_MODEL || 'openai/gpt-4o-mini',
-    timeoutMs: Number(process.env.LLM_TIMEOUT_MS || 15000),
+    timeoutMs: Number(process.env.LLM_TIMEOUT_MS || 60000),
   },
   devSeed: (process.env.DISPUTEIQ_DEV_SEED || 'true') === 'true',
   // A Razorpay integration is "live" only when BOTH a key id and secret exist.
