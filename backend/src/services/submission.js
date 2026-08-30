@@ -183,14 +183,21 @@ export async function submitDispute(disputeId, { actor = 'HUMAN' } = {}) {
     throw err;
   }
 
-  // 9: idempotency — never submit the same dispute+draft twice.
+  // 9: idempotency + concurrency safety (M1 fix).
+  // The dedup check returns an existing TERMINAL/IN-PROGRESS row without
+  // inserting. For the actual claim we INSERT the SUBMISSION_PENDING row
+  // FIRST and rely on the UNIQUE(disputeId, draftVersion, status) index to
+  // guarantee exactly one concurrent owner. A racer that loses the insert race
+  // is caught and classified as deduplicated — it NEVER makes a second Razorpay
+  // call. This closes the TOCTOU window that existed when the SELECT and the
+  // INSERT were separate, non-atomic steps.
   const existing = findExistingSubmission(disputeId, draft.draftVersion);
   if (existing && SUCCESS_STATUSES.includes(existing.status)) {
     audit({ actor: 'SYSTEM', eventType: 'SUBMISSION_DEDUPED', entityType: 'DISPUTE', entityId: disputeId, statusText: 'Returned existing submission; no duplicate call made.', metadata: { submissionId: existing.id, actor } });
     return toShape(existing);
   }
   if (existing && existing.status === 'SUBMISSION_PENDING') {
-    // In-flight from a prior identical request.
+    // In-flight from a concurrent/prior identical request.
     return toShape(existing);
   }
   if (existing && (existing.status === 'SUBMISSION_REQUIRES_REVIEW' || existing.status === 'SUBMISSION_FAILED')) {
@@ -205,8 +212,19 @@ export async function submitDispute(disputeId, { actor = 'HUMAN' } = {}) {
   const startedAt = now();
   const recId = `sub_${requestId}`;
   const base = { id: recId, disputeId, draftId: draft.id, draftVersion: draft.draftVersion, mode, status: 'SUBMISSION_PENDING', requestId, startedAt };
-  persistSubmission(base);
-  markDisputeSubmitted(disputeId, 'SUBMISSION_PENDING', startedAt);
+
+  try {
+    persistSubmission(base); // INSERT PENDING — guarded by UNIQUE index
+    markDisputeSubmitted(disputeId, 'SUBMISSION_PENDING', startedAt);
+  } catch (e) {
+    // A concurrent request won the unique-constraint race. Treat as deduped.
+    if (isUniqueViolation(e)) {
+      const dup = findExistingSubmission(disputeId, draft.draftVersion);
+      audit({ actor: 'SYSTEM', eventType: 'SUBMISSION_DEDUPED', entityType: 'DISPUTE', entityId: disputeId, statusText: 'Concurrent duplicate blocked by unique constraint; returned existing submission.', metadata: { submissionId: dup?.id, actor } });
+      if (dup) return toShape(dup);
+    }
+    throw e;
+  }
   audit({ actor: 'SYSTEM', eventType: 'SUBMISSION_STARTED', entityType: 'DISPUTE', entityId: disputeId, statusText: `Submission started (${mode}).`, metadata: { draftVersion: draft.draftVersion, mode, actor } });
 
   if (mode === 'SIMULATED') {
@@ -282,4 +300,19 @@ function toShape(row) {
 
 function randomSuffix() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+// Detect a UNIQUE-constraint violation from node:sqlite (guards the concurrent
+// submission claim). Covers both the modern `.code` and legacy message shapes.
+function isUniqueViolation(e) {
+  if (!e) return false;
+  const code = e.code || '';
+  const msg = (e.message || '').toLowerCase();
+  return (
+    code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+    code === 'SQLITE_CONSTRAINT' ||
+    /unique/i.test(code) ||
+    /unique constraint/i.test(msg) ||
+    /columns? .* (are|is) not unique/i.test(msg)
+  );
 }

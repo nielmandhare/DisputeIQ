@@ -30,13 +30,50 @@ const upload = multer({
 
 const app = express();
 
-// CORS (dev): allow the Vite frontend (different origin) to call the API.
+// CORS (M2): strict allowlist from DISPUTEIQ_ALLOWED_ORIGINS. The wildcard "*"
+// is NEVER used when origins are configured. In dev mode (no allowlist set) we
+// reflect the request Origin so local frontends keep working — this is explicit,
+// not a silent fallback, and is logged at startup.
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowed = config.allowedOrigins;
+  const origin = req.headers.origin;
+  if (allowed.length > 0) {
+    if (origin && allowed.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+    // Unauthorized origins get NO allow-origin header (rejected).
+  } else {
+    // Dev/demo mode: reflect the caller's Origin. Not "*".
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Razorpay-Signature');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Api-Key, X-Razorpay-Signature');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
+});
+
+// API authentication (M2). Enforced ONLY when DISPUTEIQ_API_KEY is configured.
+// In dev/demo mode (no key) this is a no-op so the local frontend works unchanged.
+// Missing/invalid credentials => 401 with no secret leakage and no stack trace.
+function requireApiKey(req, res, next) {
+  if (!config.authRequired) return next();
+  const auth = req.headers['authorization'] || '';
+  const key = req.headers['x-api-key'];
+  const provided = auth.startsWith('Bearer ') ? auth.slice(7) : (key || '');
+  if (!provided || !config.apiKey || provided !== config.apiKey) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  next();
+}
+
+// Enforce the API key on all STATE-CHANGING /api routes (POST/PUT/DELETE).
+// GET (read-only observability) and OPTIONS stay public. When auth is disabled
+// (no DISPUTEIQ_API_KEY), this is a no-op — the local demo works unchanged.
+// The Razorpay webhook (/webhooks/razorpay) is excluded; it has its own HMAC auth.
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'OPTIONS') return next();
+  return requireApiKey(req, res, next);
 });
 
 // Webhook MUST read the RAW body (Razorpay signs the raw bytes).
@@ -381,7 +418,19 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'internal_error' });
 });
 
-app.listen(config.port, () => {
-  console.log(`DisputeIQ backend listening on ${config.backendBaseUrl}`);
-  console.log(`Razorpay configured: ${config.razorpayConfigured} | devSeed: ${config.devSeed}`);
-});
+// Start the server unless imported by a test harness (which mounts `app` itself).
+// Compare resolved paths so Windows drive-letter casing (D:\ vs d:\) doesn't
+// defeat the guard.
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+const isMain = resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1] || '');
+if (isMain) {
+  app.listen(config.port, () => {
+    console.log(`DisputeIQ backend listening on ${config.backendBaseUrl}`);
+    console.log(`Razorpay configured: ${config.razorpayConfigured} | devSeed: ${config.devSeed}`);
+    console.log(`Auth: ${config.authRequired ? 'ENFORCED (DISPUTEIQ_API_KEY set)' : 'dev mode (no key set)'}`);
+    console.log(`CORS: ${config.allowedOrigins.length ? config.allowedOrigins.join(', ') : 'dev mode (reflect Origin)'}`);
+  });
+}
+
+export { app };

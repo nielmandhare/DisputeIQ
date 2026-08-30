@@ -189,3 +189,82 @@ test('cross-dispute submission cannot be forced via idempotency lookup', { seria
   // Dispute b has no submission -> lookup returns nothing.
   assert.equal(findExistingSubmission(b, res.draftVersion), undefined);
 });
+
+// --- M1: concurrency / TOCTOU regression ---
+// Two concurrent submissions for the SAME dispute + draft version must result in
+// exactly ONE owner, exactly ONE external contest attempt, the second classified
+// as deduplicated, and exactly ONE row in the database. This is the race the
+// unique-constraint claim was added to prevent.
+test('concurrent duplicate submission: exactly one external attempt, second deduped', { serial: true }, async () => {
+  // Force LIVE so the external fetch actually runs and can be counted. SIMULATED
+  // makes no external call, so we could not assert "one attempt" there.
+  const prevId = process.env.RAZORPAY_KEY_ID, prevSecret = process.env.RAZORPAY_KEY_SECRET, prevMode = process.env.RAZORPAY_SUBMISSION_MODE;
+  process.env.RAZORPAY_KEY_ID = 'rzp_test_x'; process.env.RAZORPAY_KEY_SECRET = 'secret'; process.env.RAZORPAY_SUBMISSION_MODE = 'live';
+  let contestCalls = 0;
+  const origFetch = globalThis.fetch;
+  // Count ONLY the contest (financial submission) call — the operation that must
+  // happen at most once. Evidence-upload fetches are legitimate and per-evidence.
+  globalThis.fetch = async (url) => {
+    if (typeof url === 'string' && /contest/i.test(url)) contestCalls += 1;
+    return {
+      ok: true, status: 200, statusText: 'OK',
+      text: async () => JSON.stringify({ status: 'contested' }),
+      json: async () => ({ status: 'contested' }),
+    };
+  };
+  try {
+    const id = seedDispute();
+    await uploadExtracted(id, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
+    await uploadExtracted(id, 'ship.txt', 'Delivered on March 15.', 'SHIPPING_OR_DELIVERY');
+    await generateForDispute(id);
+    approveDraft(id);
+
+    // Both fire together — the unique-constraint claim serializes the owners.
+    const [r1, r2] = await Promise.all([
+      submitDispute(id, { actor: 'HUMAN' }),
+      submitDispute(id, { actor: 'HUMAN' }),
+    ]);
+
+    // Exactly one external contest attempt — the loser never calls Razorpay.
+    assert.equal(contestCalls, 1, 'concurrent submissions must make exactly ONE contest (financial) call');
+    // Exactly one submission row persisted.
+    const rows = db.prepare('SELECT COUNT(*) AS c FROM submissions WHERE disputeId=?').get(id);
+    assert.equal(rows.c, 1, 'exactly one submission row must exist');
+    // Both callers resolve to the same submission (one owner).
+    assert.equal(r1.id, r2.id, 'both concurrent submissions resolve to the same record');
+    assert.equal(r1.status, 'SUBMITTED');
+  } finally {
+    globalThis.fetch = origFetch;
+    process.env.RAZORPAY_KEY_ID = prevId; process.env.RAZORPAY_KEY_SECRET = prevSecret; process.env.RAZORPAY_SUBMISSION_MODE = prevMode;
+  }
+});
+
+// Sequential duplicate (non-concurrent) still returns the existing record.
+test('sequential duplicate submission returns existing record, no new row', { serial: true }, async () => {
+  const id = seedDispute();
+  await uploadExtracted(id, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
+  await uploadExtracted(id, 'ship.txt', 'Delivered on March 15.', 'SHIPPING_OR_DELIVERY');
+  await generateForDispute(id);
+  approveDraft(id);
+  const first = await submitDispute(id, { actor: 'HUMAN' });
+  const second = await submitDispute(id, { actor: 'HUMAN' });
+  assert.equal(second.id, first.id);
+  const rows = db.prepare('SELECT COUNT(*) AS c FROM submissions WHERE disputeId=?').get(id);
+  assert.equal(rows.c, 1);
+});
+
+// Different draft versions CAN submit independently (existing design permits).
+test('different draft versions submit independently', { serial: true }, async () => {
+  const id = seedDispute();
+  await uploadExtracted(id, 'inv.txt', 'Invoice for order ORD-1.', 'INVOICE_OR_RECEIPT');
+  await uploadExtracted(id, 'ship.txt', 'Delivered on March 15.', 'SHIPPING_OR_DELIVERY');
+  await generateForDispute(id);
+  approveDraft(id);
+  const v1 = await submitDispute(id, { actor: 'HUMAN' });
+  await generateForDispute(id);
+  approveDraft(id);
+  const v2 = await submitDispute(id, { actor: 'HUMAN' });
+  assert.notEqual(v1.id, v2.id, 'distinct draft versions produce distinct submissions');
+  const rows = db.prepare('SELECT COUNT(*) AS c FROM submissions WHERE disputeId=?').get(id);
+  assert.equal(rows.c, 2);
+});

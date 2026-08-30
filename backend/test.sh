@@ -12,6 +12,7 @@ node --test tests/timeline.test.js
 node --test tests/ers.test.js
 node --test tests/responseDraft.test.js
 node --test tests/submission.test.js
+node --test tests/auth.test.js
 node --test tests/finalSuite.test.js
 node --test tests/coverage.test.js
 node --test tests/evaluation.test.js

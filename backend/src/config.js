@@ -28,6 +28,22 @@ export const config = {
   },
   databasePath: process.env.DATABASE_PATH || './disputeiq.db',
   storageDir: process.env.STORAGE_DIR || './storage',
+  // --- Production hardening (M2) ---
+  // Server-side API key. When SET, mutating/sensitive routes require
+  // `Authorization: Bearer <key>` (or `x-api-key` header). When UNSET, the
+  // backend runs in explicit dev/demo mode with auth disabled (the local
+  // hackathon demo needs no key). NEVER put the real key in the frontend.
+  apiKey: process.env.DISPUTEIQ_API_KEY || '',
+  // CORS allowlist. When SET (comma-separated origins), only those origins are
+  // permitted and the wildcard "*" is never used. When UNSET, dev mode reflects
+  // the request Origin (still not a silent "*" in production config).
+  get allowedOrigins() {
+    return (process.env.DISPUTEIQ_ALLOWED_ORIGINS || '')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+  },
+  get authRequired() {
+    return Boolean(this.apiKey);
+  },
   llm: {
     apiKey: process.env.LLM_API_KEY || '',
     baseUrl: process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1',
