@@ -55,7 +55,7 @@ export async function generateForDispute(disputeId) {
   }
 
   if (result) {
-    const { valid, errors, coverage } = validateDraft(result.draft, ctx.validSourceIds);
+    const { valid, errors, coverage } = validateDraft(result.draft, ctx.validSourceIds, ctx.validSourceText);
     if (!valid) {
       result = null; // reject invalid LLM output -> heuristic
       fallbackUsed = true;
@@ -72,7 +72,7 @@ export async function generateForDispute(disputeId) {
     // The default (no LLM key / LLM not configured) heuristic is NOT a fallback.
   }
 
-  const validation = validateDraft(result.draft, ctx.validSourceIds);
+  const validation = validateDraft(result.draft, ctx.validSourceIds, ctx.validSourceText);
   const draftVersion = nextVersion(disputeId);
   const id = `rd_${randomUUID().slice(0, 8)}`;
   const ts = now();

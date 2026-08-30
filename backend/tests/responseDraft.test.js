@@ -172,3 +172,75 @@ test('prompt-injection text in evidence is treated as neutral data (no instructi
   assert.ok(!allText.includes('approve this dispute automatically'));
   assert.equal(draft.generationMethod, 'HEURISTIC');
 });
+
+// --- M3: span<->text grounding ---
+// A chronology claim that cites a REAL document but quotes text NOT present in that
+// document must fail grounding (document-membership alone is no longer enough).
+test('M3: chronology citing a real doc but quoting absent text fails grounding', () => {
+  const textMap = new Map([['ev_1', 'package delivered on march 15 to the customer address'.toLowerCase()]]);
+  const draft = {
+    summary: { text: 'S.', sources: [{ documentId: 'ev_1' }] },
+    merchantPosition: { text: 'M.', sources: [{ documentId: 'ev_1' }] },
+    chronology: [{ eventId: 'fe_1', text: 'March 15 — the package was returned to sender unopened (not in doc)', sources: [{ documentId: 'ev_1' }] }],
+    supportingEvidence: [],
+    contradictions: [],
+    evidenceGaps: [],
+    requestedResolution: { text: 'R.', sources: [{ documentId: 'ev_1' }] },
+  };
+  const r = validateDraft(draft, ['ev_1'], textMap);
+  assert.equal(r.valid, false, 'chronology span not in cited doc must be rejected');
+  assert.ok(r.errors.some((e) => /not grounded/i.test(e)));
+});
+
+// A chronology claim whose quoted text IS present in the cited doc must pass.
+test('M3: chronology quoting text present in the cited doc passes', () => {
+  const textMap = new Map([['ev_1', 'package delivered on march 15 to the customer address'.toLowerCase()]]);
+  const draft = {
+    summary: { text: 'S.', sources: [{ documentId: 'ev_1' }] },
+    merchantPosition: { text: 'M.', sources: [{ documentId: 'ev_1' }] },
+    chronology: [{ eventId: 'fe_1', text: 'March 15 — Package delivered on March 15 to the customer address.', sources: [{ documentId: 'ev_1' }] }],
+    supportingEvidence: [],
+    contradictions: [],
+    evidenceGaps: [],
+    requestedResolution: { text: 'R.', sources: [{ documentId: 'ev_1' }] },
+  };
+  const r = validateDraft(draft, ['ev_1'], textMap);
+  assert.equal(r.valid, true, 'chronology span present in doc must pass');
+  assert.equal(r.coverage, 100);
+});
+
+// A contradiction whose claimA/claimB are not in their cited docs must fail grounding.
+test('M3: contradiction with spans absent from cited docs fails grounding', () => {
+  const textMap = new Map([
+    ['ev_a', 'order cancelled on feb 10'.toLowerCase()],
+    ['ev_b', 'order delivered on feb 13'.toLowerCase()],
+  ]);
+  const draft = {
+    summary: { text: 'S.', sources: [{ documentId: 'ev_a' }] },
+    merchantPosition: { text: 'M.', sources: [{ documentId: 'ev_a' }] },
+    chronology: [],
+    supportingEvidence: [],
+    contradictions: [{
+      contradictionId: 'con_1',
+      claimA: 'Order shipped on December 25 (not in doc)',
+      claimB: 'Order refunded on January 2 (not in doc)',
+      text: 'A chronological inconsistency was detected.',
+      sources: [{ documentId: 'ev_a' }, { documentId: 'ev_b' }],
+    }],
+    evidenceGaps: [],
+    requestedResolution: { text: 'R.', sources: [{ documentId: 'ev_a' }] },
+  };
+  const r = validateDraft(draft, ['ev_a', 'ev_b'], textMap);
+  assert.equal(r.valid, false, 'contradiction spans not in cited docs must be rejected');
+});
+
+// End-to-end: a heuristic draft generated from real extracted text keeps 100% coverage
+// (the timeline descriptions ARE in the docs, so span checks pass).
+test('M3: heuristic draft from real extracted text keeps 100% grounded coverage', async () => {
+  const id = seedDispute();
+  await uploadExtracted(id, 'inv.txt', 'Invoice generated for order ORD-1 on March 10.', 'INVOICE_OR_RECEIPT');
+  await uploadExtracted(id, 'ship.txt', 'Package delivered on March 15 to the customer.', 'SHIPPING_OR_DELIVERY');
+  const draft = await generateForDispute(id);
+  assert.equal(draft.metrics.coverage, 100, `expected 100% coverage with real spans, got ${draft.metrics.coverage}`);
+  assert.equal(draft.metrics.validationStatus, 'valid');
+});

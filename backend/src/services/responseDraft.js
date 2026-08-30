@@ -18,6 +18,13 @@ import { llmConfigured, callLLM } from './llm.js';
  */
 export function assembleContext({ dispute, evidence, timeline, contradictions, ers, gaps }) {
   const validSourceIds = new Set(evidence.map((e) => e.id));
+  // M3: map of documentId -> lowercased extracted text, used to verify that a
+  // claim's cited span actually exists in the source document (not just that the
+  // documentId is a member of the valid set).
+  const validSourceText = new Map();
+  for (const e of evidence) {
+    if (e.extractedText) validSourceText.set(e.id, String(e.extractedText).toLowerCase());
+  }
   return {
     disputeId: dispute.id,
     reasonCode: dispute.reasonCode,
@@ -56,6 +63,7 @@ export function assembleContext({ dispute, evidence, timeline, contradictions, e
     ers: ers ? { score: ers.score, label: ers.label, requiredPresent: ers.requiredPresent, requiredTotal: ers.requiredTotal } : null,
     gaps: gaps.map((g) => ({ evidenceType: g.evidenceType, label: g.label, required: g.required, present: g.present })),
     validSourceIds: [...validSourceIds],
+    validSourceText,
   };
 }
 
@@ -134,10 +142,12 @@ export function generateHeuristicDraft(ctx) {
   const contradictions = ctx.contradictions.map((c) => ({
     contradictionId: c.id,
     text: c.explanation || `A ${c.type} inconsistency was detected (${c.claimA} vs ${c.claimB}).`,
+    // M3: carry the real evidence id as documentId (not just the source name) so
+    // grounding can verify the cited span actually exists in that document.
     sources: [
-      { documentId: null, sourceDocument: c.sourceA, sourceLocation: null },
-      { documentId: null, sourceDocument: c.sourceB, sourceLocation: null },
-    ].filter((s) => s.sourceDocument),
+      { documentId: c.sourceA || null, sourceDocument: c.sourceA, sourceLocation: null },
+      { documentId: c.sourceB || null, sourceDocument: c.sourceB, sourceLocation: null },
+    ].filter((s) => s.documentId || s.sourceDocument),
   }));
 
   // 6. Evidence gaps (only from real gap data; never invented)
@@ -233,13 +243,46 @@ function configProvider() {
 
 const SECTIONS = ['summary', 'merchantPosition', 'chronology', 'supportingEvidence', 'contradictions', 'evidenceGaps', 'requestedResolution'];
 
+// M3: normalize to [a-z0-9 ] so punctuation/dashes/symbols don't defeat matching.
+function normalizeText(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Returns true if the claim text contains at least one substantive fragment (a window
+// of >=4 consecutive words) that actually exists in the cited document's extracted text.
+// If the doc has no text (e.g. OCR-failed), we cannot verify and accept it. Claims too
+// short to yield a 4-word window are also accepted (nothing meaningful to verify).
+function spanGrounded(text, docText) {
+  if (!docText) return true; // unverifiable -> do not penalize
+  const claim = normalizeText(text);
+  const doc = normalizeText(docText);
+  if (!claim) return true;
+  const words = claim.split(' ').filter(Boolean);
+  if (words.length < 4) return true; // too short to verify reliably
+  const maxN = Math.min(words.length, 6);
+  for (let n = maxN; n >= 4; n--) {
+    for (let i = 0; i + n <= words.length; i++) {
+      const win = words.slice(i, i + n).join(' ');
+      if (doc.includes(win)) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Validate a draft against the schema + grounding rules.
  * Returns { valid, errors, claimCount, groundedCount, coverage }.
+ *
+ * M3 strengthening: for claims that are expected to be verbatim from a source
+ * (chronology events and contradictions), the cited documentId must map to a real
+ * document AND a fragment of the claim text (claimA/claimB for contradictions) must
+ * actually appear in that document's extracted text. Document-membership alone is no
+ * longer sufficient for those claim types.
  */
-export function validateDraft(draft, validSourceIds) {
+export function validateDraft(draft, validSourceIds, validSourceText) {
   const errors = [];
   const idSet = new Set(validSourceIds);
+  const textMap = validSourceText instanceof Map ? validSourceText : new Map();
   if (!draft || typeof draft !== 'object') {
     return { valid: false, errors: ['draft is not an object'], claimCount: 0, groundedCount: 0, coverage: 0 };
   }
@@ -249,25 +292,41 @@ export function validateDraft(draft, validSourceIds) {
   let claimCount = 0;
   let groundedCount = 0;
 
-  const checkSources = (node, label, requireSource = true) => {
+  const checkSources = (node, label, requireSource = true, spanCheck = false) => {
     if (!node || typeof node !== 'object') return;
     const txt = typeof node.text === 'string' ? node.text.trim() : '';
     const srcs = Array.isArray(node.sources) ? node.sources : [];
     if (!txt) return; // nothing claimed
     if (!requireSource) return; // overview/gap notes are meta; not scored as factual claims
     claimCount += 1;
-    const hasValid = srcs.some((s) => s && (idSet.has(s.documentId) || (s.sourceDocument && !s.documentId)));
+    const hasValid = srcs.some((s) => {
+      if (!s) return false;
+      if (s.documentId && !idSet.has(s.documentId) && !(s.sourceDocument && !s.documentId)) return false;
+      // documentId present and valid (or sourceDocument-only provenance)
+      const docOk = idSet.has(s.documentId) || (s.sourceDocument && !s.documentId);
+      if (!docOk) return false;
+      if (spanCheck && s.documentId) {
+        const docText = textMap.get(s.documentId);
+        // For span-checked claims, require the text to actually appear in the doc.
+        return spanGrounded(txt, docText);
+      }
+      return true;
+    });
     if (hasValid) groundedCount += 1;
     else if (srcs.length === 0) errors.push(`${label}: claim has no sources`);
-    else errors.push(`${label}: claim sources not in validSourceIds`);
+    else errors.push(`${label}: claim sources not grounded in cited document`);
   };
 
   checkSources(draft.summary, 'summary', true);
   checkSources(draft.merchantPosition, 'merchantPosition', true);
   checkSources(draft.requestedResolution, 'requestedResolution', true);
-  if (Array.isArray(draft.chronology)) draft.chronology.forEach((c, i) => checkSources(c, `chronology[${i}]`, true));
+  if (Array.isArray(draft.chronology)) draft.chronology.forEach((c, i) => checkSources(c, `chronology[${i}]`, true, true));
   if (Array.isArray(draft.supportingEvidence)) draft.supportingEvidence.forEach((s, i) => checkSources(s, `supportingEvidence[${i}]`, true));
-  if (Array.isArray(draft.contradictions)) draft.contradictions.forEach((c, i) => checkSources(c, `contradictions[${i}]`, true));
+  if (Array.isArray(draft.contradictions)) draft.contradictions.forEach((c, i) => {
+    // Contradictions: verify BOTH claimA and claimB spans appear in their cited docs.
+    const claimText = [c.claimA, c.claimB, c.text].filter(Boolean).join(' ');
+    checkSources({ text: claimText, sources: c.sources }, `contradictions[${i}]`, true, true);
+  });
   if (Array.isArray(draft.evidenceGaps)) draft.evidenceGaps.forEach((g, i) => checkSources(g, `evidenceGaps[${i}]`, false));
 
   const coverage = claimCount ? Math.round((groundedCount / claimCount) * 100) : 100;
