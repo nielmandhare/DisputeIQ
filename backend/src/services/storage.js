@@ -25,10 +25,11 @@ function safeSegment(s) {
 export const storage = {
   /** Save a buffer for a dispute. Returns { safeName, storageLocation, fullPath }. */
   async save(disputeId, originalName, buffer) {
+    const safeDispute = safeSegment(disputeId); // L1: never trust disputeId as a raw path segment
     const safeName = `${randomUUID()}_${safeSegment(originalName)}`;
-    const storageLocation = `${disputeId}/${safeName}`;
+    const storageLocation = `${safeDispute}/${safeName}`;
     const fullPath = join(root(), storageLocation);
-    await fs.mkdir(join(root(), disputeId), { recursive: true });
+    await fs.mkdir(join(root(), safeDispute), { recursive: true });
     await fs.writeFile(fullPath, buffer);
     // storageLocation is a logical reference, never an absolute fs path.
     return { safeName, storageLocation, fullPath };

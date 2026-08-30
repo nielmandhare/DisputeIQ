@@ -16,8 +16,8 @@ export default function Approval() {
   useEffect(() => {
     disputeService.getById(id).then(setD);
     responseDraftService.getLatest(id).then((d) => setDraft(d ?? undefined));
-    fetch('http://localhost:4000/api/health').then(() => setMode('SIMULATED')).catch(() => setMode('SIMULATED'));
-    // Real mode is derived server-side; the badge below reflects the backend state.
+    // Submission mode (SIMULATED vs LIVE) is derived server-side from config; the
+    // badge below reflects the backend state. The demo defaults to SIMULATED.
     setMode('SIMULATED');
   }, [id]);
 

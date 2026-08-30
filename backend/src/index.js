@@ -86,7 +86,9 @@ app.post('/webhooks/razorpay',
   });
 
 // JSON body for the rest.
-app.use(express.json());
+// L3: cap JSON body size to mitigate payload-based DoS.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health
 app.get('/api/health', (_req, res) => {

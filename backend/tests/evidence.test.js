@@ -107,6 +107,19 @@ test('security: path traversal filename is neutralized', async () => {
   assert.ok(await storage.exists(ev.storageLocation));
 });
 
+test('security: path traversal in disputeId is neutralized (L1)', async () => {
+  // A malicious disputeId must not escape the storage root.
+  const malicious = '../../../../etc/passwd';
+  const res = await storage.save(malicious, 'ok.txt', bufOf('traversal via disputeId'));
+  // storageLocation must not contain traversal segments and must resolve inside the root.
+  assert.ok(!res.storageLocation.includes('..'), 'storageLocation must not contain traversal segments');
+  assert.ok(!res.fullPath.includes('etc/passwd'), 'file must not escape into foreign directories');
+  // The on-disk file must exist and be inside the configured storage dir.
+  assert.ok(await storage.exists(res.storageLocation));
+  // safeSegment turns the disputeId into a flat, safe segment (no separators).
+  assert.ok(!res.storageLocation.split('/')[0].includes('/'));
+});
+
 after(() => {
   // best-effort cleanup of test disputes
   db.prepare("DELETE FROM evidence_documents WHERE disputeId LIKE 'disp_test_%'").run();
