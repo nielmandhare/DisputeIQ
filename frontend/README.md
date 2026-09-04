@@ -1,32 +1,39 @@
-# React + TypeScript + Vite
+# DisputeIQ — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + TypeScript + Vite SPA for DisputeIQ (Razorpay Buildathon 2026, Track 2 — AI Risk Manager).
 
-Currently, two official plugins are available:
+See the [project README](../../README.md) for what DisputeIQ is, the safety model, and the full run instructions (backend first, then this).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Run
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The dev server listens on `http://localhost:5173` and proxies `/api` to the backend at `http://localhost:4000`.
+
+## Build
+
+```bash
+npm run build        # production build (outputs to dist/)
+npm run preview      # preview the production build locally
+```
+
+## Stack
+
+- React 18 + TypeScript
+- Vite (dev server + build)
+- React Router for page navigation
+- Plain CSS (tokens + globals) — no component library
+- API service layer in `src/services/` with a mock fallback for offline/demo browsing
+
+## Pages
+
+Overview, Disputes, DisputeDetail, Evidence, Classification, Contradiction, Gaps, Dossier, Approval, Submitted, Audit, Activity, AIAnalysis, Settings, HelpDocs.
+
+## Notes
+
+- The frontend proxies API calls to the backend; it does **not** hold any secrets.
+- `.env` files are gitignored on both sides. Configure via `backend/.env.example` → `backend/.env`.
