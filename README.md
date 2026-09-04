@@ -6,6 +6,38 @@ DisputeIQ is a local-first command center for a merchant-facing dispute team: it
 
 **Important honesty note:** the default demo dataset is **synthetic** and labeled `provider='demo'`. It is never presented as a real Razorpay dispute. The real Razorpay contest submission path exists and is wired, but **RAZORPAY_SUBMISSION_MODE defaults to `SIMULATED`** so it never sends a real request until you explicitly enable it.
 
+## 5-minute demo (for judges)
+
+This is the flow you can run in about five minutes with **no Razorpay keys**:
+
+1. **Start the backend + frontend.**
+   ```bash
+   cd backend && npm install && cp .env.example .env && npm start   # :4000
+   cd frontend && npm install && npm run dev                        # :5173
+   ```
+   (If you have Omniroute running on `localhost:20128/v1` and set `LLM_API_KEY`, drafts use the LLM; otherwise they use the built-in deterministic HEURISTIC engine — the app still works either way.)
+
+2. **Load the labeled synthetic demo dataset** (runs the full pipeline over 100 disputes).
+   ```bash
+   curl -X POST http://localhost:4000/api/demo/seed
+   ```
+   This gives you 100 disputes, evidence docs, OCR-required flags, contradictions, ERS scores, timeline events, and response drafts — with a **real** audit trail and AI-analysis events (HEURISTIC when the LLM isn't active, or LLM/Claude when Omniroute is up).
+
+3. **Open http://localhost:5173.**
+   The **Overview** page shows real backend metrics (e.g. 100 disputes, ₹2,50,200 disputed, AVG ERS 71, 256 evidence docs, 18 contradictions, 31 contest-ready).
+
+4. **Walk one dispute end-to-end.**
+   - Pick a dispute (e.g. a "Product not as described" case) → **Dossier**.
+   - **Regenerate draft** — if Omniroute is up you'll see `LLM / Omniroute / Claude Sonnet 4.5`; otherwise `HEURISTIC / Deterministic engine`. Every draft is schema-validated and grounding-checked before it's persisted.
+   - **Approve draft** (human gate — mandatory; the server re-verifies preconditions).
+   - **Submit** — it's `SIMULATED` by default, so it returns a clearly-labeled simulated contest result without touching Razorpay.
+   - Open **Audit** / **AI Analysis** and watch the real events: `DISPUTE_RECEIVED → ERS_COMPUTED → TIMELINE_EXTRACTED → CONTRADICTION_DETECTED → DRAFT_GENERATED → DRAFT_APPROVED → SUBMISSION_STARTED → CONTEST_ACCEPTED`, with AI events carrying provider / model / method / duration / confidence.
+
+5. **See a real contradiction surfaced.**
+   A "Product not as described" dispute can show a chronological contradiction like *"cancelled 2026-02-14"* appearing **before** *"delivered 2026-02-17"*, grounded in the actual evidence docs (customer-claim text + shipping text) — with a "Mark Contradiction as Reviewed" recovery path.
+
+**What this proves:** ingestion → classification → timeline → contradiction → ERS → grounded draft → human approval → simulated submission → real audit trail + AI observability, all with honest labels (synthetic dataset, SIMULATED submissions, HEURISTIC vs LLM reported truthfully).
+
 ## What's in here
 
 - **Backend** (`backend/`) — Node.js 22 + Express + `node:sqlite` (no external DB server). Plain ESM JS, no TypeScript build step. Real API, real DB, real audit trail, real AI-observability events.
